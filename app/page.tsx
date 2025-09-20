@@ -1,6 +1,5 @@
 "use client"
 
-import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -8,18 +7,39 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Gamepad2, Sparkles, Users, Trophy } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+import { useEffect } from "react"
+import { useAuthStore } from "@/lib/stores/auth"
 
 export default function AuthPage() {
-  const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const { login, register, isLoading, error } = useAuthStore()
 
-  const handleAuth = async (type: "login" | "signup") => {
-    setIsLoading(true)
-    // Simulate auth process
-    setTimeout(() => {
-      setIsLoading(false)
+  // Show error toast when auth error occurs
+  useEffect(() => {
+    if (error) {
+      toast.error(error)
+    }
+  }, [error])
+
+  const handleAuth = async (type: "login" | "signup", formData: FormData) => {
+    try {
+      if (type === "login") {
+        const email = formData.get("email") as string
+        const password = formData.get("password") as string
+        await login(email, password)
+      } else {
+        const username = formData.get("username") as string
+        const email = formData.get("email") as string
+        const password = formData.get("password") as string
+        await register(username, email, password)
+      }
       router.push("/dashboard")
-    }, 2000)
+      toast.success(`Successfully ${type === "login" ? "logged in" : "registered"}!`)
+    } catch (err) {
+      console.error(err)
+      // Error is handled by the auth store and shown via useEffect
+    }
   }
 
   return (
@@ -59,76 +79,103 @@ export default function AuthPage() {
                 </TabsTrigger>
               </TabsList>
 
+              {/* Login Form */}
               <TabsContent value="login" className="space-y-4 mt-6">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="player@gamehub.com"
-                    className="glass border-white/20 focus:border-primary/50"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input id="password" type="password" className="glass border-white/20 focus:border-primary/50" />
-                </div>
-                <Button
-                  onClick={() => handleAuth("login")}
-                  disabled={isLoading}
-                  className="w-full bg-primary hover:bg-primary/90 glow-hover"
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    const formData = new FormData(e.currentTarget)
+                    handleAuth("login", formData)
+                  }}
+                  className="space-y-4"
                 >
-                  {isLoading ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Signing In...
-                    </div>
-                  ) : (
-                    "Sign In"
-                  )}
-                </Button>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      required
+                      placeholder="player@gamehub.com"
+                      className="glass border-white/20 focus:border-primary/50"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      name="password"
+                      type="password"
+                      required
+                      className="glass border-white/20 focus:border-primary/50"
+                    />
+                  </div>
+                  <Button type="submit" disabled={isLoading} className="w-full bg-primary hover:bg-primary/90 glow-hover">
+                    {isLoading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Signing In...
+                      </div>
+                    ) : (
+                      "Sign In"
+                    )}
+                  </Button>
+                </form>
               </TabsContent>
 
+              {/* Signup Form */}
               <TabsContent value="signup" className="space-y-4 mt-6">
-                <div className="space-y-2">
-                  <Label htmlFor="username">Username</Label>
-                  <Input
-                    id="username"
-                    placeholder="player11"
-                    className="glass border-white/20 focus:border-primary/50"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
-                  <Input
-                    id="signup-email"
-                    type="email"
-                    placeholder="player@gamehub.com"
-                    className="glass border-white/20 focus:border-primary/50"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-password">Password</Label>
-                  <Input
-                    id="signup-password"
-                    type="password"
-                    className="glass border-white/20 focus:border-primary/50"
-                  />
-                </div>
-                <Button
-                  onClick={() => handleAuth("signup")}
-                  disabled={isLoading}
-                  className="w-full bg-primary hover:bg-primary/90 glow-hover"
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    const formData = new FormData(e.currentTarget)
+                    handleAuth("signup", formData)
+                  }}
+                  className="space-y-4"
                 >
-                  {isLoading ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Creating Account...
-                    </div>
-                  ) : (
-                    "Create Account"
-                  )}
-                </Button>
+                  <div className="space-y-2">
+                    <Label htmlFor="username">Username</Label>
+                    <Input
+                      id="username"
+                      name="username"
+                      required
+                      placeholder="player11"
+                      className="glass border-white/20 focus:border-primary/50"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-email">Email</Label>
+                    <Input
+                      id="signup-email"
+                      name="email"
+                      type="email"
+                      required
+                      placeholder="player@gamehub.com"
+                      className="glass border-white/20 focus:border-primary/50"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-password">Password</Label>
+                    <Input
+                      id="signup-password"
+                      name="password"
+                      type="password"
+                      required
+                      minLength={6}
+                      className="glass border-white/20 focus:border-primary/50"
+                    />
+                  </div>
+                  <Button type="submit" disabled={isLoading} className="w-full bg-primary hover:bg-primary/90 glow-hover">
+                    {isLoading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Creating Account...
+                      </div>
+                    ) : (
+                      "Create Account"
+                    )}
+                  </Button>
+                </form>
               </TabsContent>
             </Tabs>
           </CardContent>

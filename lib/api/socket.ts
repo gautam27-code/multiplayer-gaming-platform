@@ -1,12 +1,32 @@
 import { io, Socket as SocketIOClient } from 'socket.io-client';
 import { API_BASE_URL } from './config';
 
+interface GameState {
+  id: string;
+  board: Array<string | null>;
+  currentTurn: string;
+  players: {
+    [key: string]: {
+      id: string;
+      ready: boolean;
+      symbol: 'X' | 'O';
+    };
+  };
+  status: 'waiting' | 'ready' | 'in-progress' | 'finished';
+  winner?: string;
+}
+
+interface GameMove {
+  row: number;
+  col: number;
+}
+
 interface ServerToClientEvents {
-  'game-update': (gameState: any) => void;
-  'game-over': (data: { winner: string; game: any }) => void;
-  'player-ready-update': (data: { playerId: string; game: any }) => void;
-  'game-start': (gameState: any) => void;
-  'player-disconnected': (data: { playerId: string; game: any }) => void;
+  'game-update': (gameState: GameState) => void;
+  'game-over': (data: { winner: string; game: GameState }) => void;
+  'player-ready-update': (data: { playerId: string; game: GameState }) => void;
+  'game-start': (gameState: GameState) => void;
+  'player-disconnected': (data: { playerId: string; game: GameState }) => void;
   error: (error: { message: string }) => void;
   connect: () => void;
   disconnect: () => void;
@@ -15,7 +35,7 @@ interface ServerToClientEvents {
 interface ClientToServerEvents {
   'join-game': (gameId: string) => void;
   'leave-game': (gameId: string) => void;
-  'make-move': (data: { gameId: string; position: any }) => void;
+  'make-move': (data: { gameId: string; position: GameMove }) => void;
   'player-ready': (gameId: string) => void;
 }
 
@@ -62,7 +82,7 @@ export const leaveGameRoom = () => {
   }
 };
 
-export const makeMove = (position: any) => {
+export const makeMove = (position: GameMove) => {
   if (socket && socket.gameId) {
     socket.emit('make-move', {
       gameId: socket.gameId,

@@ -26,18 +26,29 @@ export async function fetchApi<T>(
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...fetchOptions,
-    headers,
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...fetchOptions,
+      headers,
+    });
 
-  const data = await response.json();
+    const data = await response.json();
 
-  if (!response.ok) {
-    throw new ApiError(response.status, data.message || 'Something went wrong');
+    if (!response.ok) {
+      throw new ApiError(
+        response.status, 
+        data.message || response.statusText || 'Something went wrong'
+      );
+    }
+
+    return data;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    // Handle network errors or other issues
+    throw new ApiError(500, error instanceof Error ? error.message : 'Network error occurred');
   }
-
-  return data;
 }
 
 // Auth API calls

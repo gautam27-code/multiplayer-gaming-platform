@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
+import { useRouter } from "next/navigation"
 import {
   Gamepad2,
   Trophy,
@@ -22,25 +23,52 @@ import {
   Search,
 } from "lucide-react"
 import Link from "next/link"
+import { useAuthStore } from "@/lib/stores/auth"
 
 export default function Dashboard() {
-  const [playerData] = useState({
-    username: "player11",
-    avatar: "/diverse-gaming-avatars.png",
+  const router = useRouter();
+  const { user, logout } = useAuthStore();
+  const [playerData, setPlayerData] = useState({
+    username: user?.username || "Player",
+    avatar: "/tanjiro.png",
     stats: {
-      matchesPlayed: 127,
-      wins: 89,
-      losses: 38,
-      winRate: 70,
-      globalRank: 1247,
-      points: 2840,
+      matchesPlayed: user?.stats?.matchesPlayed || 0,
+      wins: user?.stats?.wins || 0,
+      losses: user?.stats?.losses || 0,
+      winRate: user?.stats?.winRate || 0,
+      globalRank: user?.stats?.globalRank || 0,
+      points: user?.stats?.points || 0,
     },
     recentGames: [
       { game: "Tic-Tac-Toe", result: "win", opponent: "player22", time: "2 hours ago" },
       { game: "Tic-Tac-Toe", result: "loss", opponent: "player33", time: "5 hours ago" },
       { game: "Tic-Tac-Toe", result: "win", opponent: "player44", time: "1 day ago" },
-    ],
-  })
+    ]
+  });
+
+  useEffect(() => {
+    if (user) {
+      setPlayerData(prev => ({
+        ...prev,
+        username: user.username,
+        stats: {
+          matchesPlayed: user.stats?.matchesPlayed || 0,
+          wins: user.stats?.wins || 0,
+          losses: user.stats?.losses || 0,
+          winRate: user.stats?.winRate || 0,
+          globalRank: user.stats?.globalRank || 0,
+          points: user.stats?.points || 0,
+        }
+      }));
+    }
+  }, [user]);
+
+  // Protect the dashboard route
+  useEffect(() => {
+    if (!user) {
+      router.push('/');
+    }
+  }, [user, router]);
 
   const availableGames = [
     {
@@ -106,7 +134,15 @@ export default function Dashboard() {
                   Leaderboard
                 </Button>
               </Link>
-              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-destructive hover:text-destructive"
+                onClick={() => {
+                  logout();
+                  router.push('/');
+                }}
+              >
                 <LogOut className="w-4 h-4 mr-2" />
                 Logout
               </Button>
