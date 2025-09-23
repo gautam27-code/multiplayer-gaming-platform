@@ -14,16 +14,18 @@ interface AuthResponse {
       losses: number;
       winRate: number;
       globalRank: number;
+      points?: number;
     };
   };
-  message?: string;
+  message: string;
 }
 
 interface AuthState {
   token: string | null;
-  user: any | null;
+  user: AuthResponse['user'] | null;
   isLoading: boolean;
   error: string | null;
+  message: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -36,6 +38,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isLoading: false,
       error: null,
+      message: null,
 
       login: async (email: string, password: string) => {
         try {
@@ -66,7 +69,8 @@ export const useAuthStore = create<AuthState>()(
             token,
             user,
             isLoading: false,
-            error: null
+            error: null,
+            message: message || 'Successfully logged in!'
           });
 
           // Save token to localStorage for persistence
@@ -78,6 +82,7 @@ export const useAuthStore = create<AuthState>()(
           console.error('Login error:', error);
           set({
             error: error.message || 'Login failed',
+            message: null,
             isLoading: false,
             token: null,
             user: null,
@@ -108,10 +113,13 @@ export const useAuthStore = create<AuthState>()(
             token: response.token,
             user: response.user,
             isLoading: false,
+            error: null,
+            message: response.message || 'Successfully registered!'
           });
         } catch (error: any) {
           set({
             error: error.message || 'Registration failed',
+            message: null,
             isLoading: false,
           });
           throw error;

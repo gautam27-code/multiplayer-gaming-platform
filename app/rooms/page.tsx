@@ -10,57 +10,48 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Gamepad2, Users, Search, Plus, ArrowLeft, Play, Crown, Target, Clock, Filter, RefreshCw } from "lucide-react"
 import Link from "next/link"
 
+import { useEffect } from "react"
+import { useAuthStore } from "@/lib/stores/auth"
+import { gameApi } from "@/lib/api"
+
 export default function GameRooms() {
   const [searchTerm, setSearchTerm] = useState("")
   const [gameFilter, setGameFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [isLoading, setIsLoading] = useState(false)
+  const [rooms, setRooms] = useState<any[]>([])
+  const { token } = useAuthStore()
 
-  const [rooms] = useState([
-    {
-      id: "room-1",
-      name: "Quick Match Arena",
-      game: "Tic-Tac-Toe",
-      host: "player22",
-      players: 1,
-      maxPlayers: 2,
-      status: "waiting",
-      isPrivate: false,
-      createdAt: "2 min ago",
-    },
-    {
-      id: "room-2",
-      name: "Pro Players Only",
-      game: "Tic-Tac-Toe",
-      host: "player33",
-      players: 2,
-      maxPlayers: 2,
-      status: "playing",
-      isPrivate: false,
-      createdAt: "5 min ago",
-    },
-    {
-      id: "room-3",
-      name: "Casual Fun Room",
-      game: "Tic-Tac-Toe",
-      host: "player44",
-      players: 1,
-      maxPlayers: 2,
-      status: "waiting",
-      isPrivate: false,
-      createdAt: "8 min ago",
-    },
-    {
-      id: "room-4",
-      name: "Tournament Practice",
-      game: "Tic-Tac-Toe",
-      host: "player55",
-      players: 1,
-      maxPlayers: 2,
-      status: "waiting",
-      isPrivate: true,
-      createdAt: "12 min ago",
-    },
-  ])
+  const fetchRooms = async () => {
+    if (!token) return
+    try {
+      setIsLoading(true)
+      const data = await gameApi.getAvailableRooms(token)
+      // Map API rooms to UI format
+      const mapped = (data as any[]).map((g) => ({
+        id: g._id,
+        roomCode: g.roomCode,
+        name: g.name,
+        game: g.type === 'tic-tac-toe' ? 'Tic-Tac-Toe' : g.type,
+        host: g.players?.[0]?.user?.username || 'host',
+        players: g.players?.length || 1,
+        maxPlayers: 2,
+        status: 'waiting',
+        isPrivate: false,
+        createdAt: new Date(g.createdAt).toLocaleTimeString(),
+      }))
+      setRooms(mapped)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchRooms()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token])
 
   const filteredRooms = rooms.filter((room) => {
     const matchesSearch =
@@ -85,9 +76,15 @@ export default function GameRooms() {
     }
   }
 
-  const handleJoinRoom = (roomId: string) => {
-    // Navigate to game room
-    window.location.href = `/game/${roomId}`
+  const handleJoinRoom = async (room: any) => {
+    if (!token) return
+    try {
+      const joined = await gameApi.joinRoom(token, room.roomCode)
+      const game = (joined as any).game
+      window.location.href = `/game/${game._id}`
+    } catch (e) {
+      console.error(e)
+    }
   }
 
   return (
@@ -176,9 +173,9 @@ export default function GameRooms() {
                 </SelectContent>
               </Select>
 
-              <Button variant="outline" className="glass border-white/20 glow-hover bg-transparent">
+              <Button variant="outline" className="glass border-white/20 glow-hover bg-transparent" onClick={fetchRooms} disabled={isLoading}>
                 <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
+                {isLoading ? 'Refreshing…' : 'Refresh'}
               </Button>
             </div>
           </CardContent>
@@ -318,8 +315,8 @@ export default function GameRooms() {
                       </div>
 
                       <Button
-                        onClick={() => handleJoinRoom(room.id)}
-                        disabled={room.status === "full" || room.status === "playing"}
+                        onClick={() => handleJoinRoom(room)}
+                        disabled={room.status === "full" || room.status === "playing" || isLoading}
                         className={`${room.status === "waiting" ? "bg-primary hover:bg-primary/90 glow-hover" : ""}`}
                         variant={room.status === "waiting" ? "default" : "outline"}
                       >

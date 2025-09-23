@@ -34,14 +34,17 @@ const FloatingCharacter = ({ emoji, delay = 0 }: { emoji: string; delay?: number
 
 export default function AuthPage() {
   const router = useRouter()
-  const { login, register, isLoading, error } = useAuthStore()
+  const { login, register, isLoading, error, message } = useAuthStore()
 
-  // Show error toast when auth error occurs
+  // Handle auth messages (both errors and success)
   useEffect(() => {
     if (error) {
-      toast.error(error)
+      toast.error(error);
     }
-  }, [error])
+    if (message) {
+      toast.success(message);
+    }
+  }, [error, message])
 
   const handleAuth = async (type: "login" | "signup", formData: FormData) => {
     try {
@@ -56,7 +59,7 @@ export default function AuthPage() {
         await register(username, email, password)
       }
       router.push("/dashboard")
-      toast.success(`Successfully ${type === "login" ? "logged in" : "registered"}!`)
+      // Success toast will be shown via the auth store's message
     } catch (err) {
       console.error(err)
       // Error is handled by the auth store and shown via useEffect

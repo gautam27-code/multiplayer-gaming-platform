@@ -22,32 +22,84 @@ import {
 import Link from "next/link"
 import { useParams } from "next/navigation"
 
+import { useAuthStore } from "@/lib/stores/auth"
+import socketSvc, { initializeSocket, joinGameRoom, makeMove as socketMakeMove, setPlayerReady as socketReady } from "@/lib/api/socket"
+import { gameApi } from "@/lib/api"
+
 type Player = "X" | "O" | null
 type GameState = "waiting" | "playing" | "finished"
 type Winner = "X" | "O" | "draw" | null
 
 export default function TicTacToeGame() {
   const params = useParams()
-  const roomId = params.roomId as string
+  const gameId = params.roomId as string
+  const { token } = useAuthStore()
 
   // Game state
   const [board, setBoard] = useState<Player[]>(Array(9).fill(null))
   const [currentPlayer, setCurrentPlayer] = useState<Player>("X")
-  const [gameState, setGameState] = useState<GameState>("playing")
+  const [gameState, setGameState] = useState<GameState>("waiting")
   const [winner, setWinner] = useState<Winner>(null)
   const [gameTime, setGameTime] = useState(0)
   const [soundEnabled, setSoundEnabled] = useState(true)
 
   // Room state
-  const [roomData] = useState({
-    id: roomId,
-    name: "Quick Match Arena",
-    players: [
-      { id: "1", username: "player11", avatar: "/placeholder.svg?key=player1", symbol: "X", isHost: true },
-      { id: "2", username: "player22", avatar: "/placeholder.svg?key=player2", symbol: "O", isHost: false },
-    ],
-    spectators: 3,
+  const [roomData, setRoomData] = useState<any>({
+    id: gameId,
+    name: "Room",
+    players: [],
+    spectators: 0,
   })
+
+  // Fetch initial game state and setup socket
+  useEffect(() => {
+    const run = async () => {
+      if (!token || !gameId) return
+      try {
+        const data = await gameApi.getGameState(token, gameId)
+        const g: any = data
+        setRoomData({
+          id: g._id,
+          name: g.name,
+          players: (g.players || []).map((p: any) => ({
+            id: p.user._id?.toString?.() || p.user,
+            username: p.user.username || 'Player',
+            avatar: '/placeholder.svg',
+            symbol: p.symbol || null,
+            isHost: false,
+          })),
+          spectators: 0,
+        })
+        if (Array.isArray(g.board) && g.board.length === 9) setBoard(g.board)
+        setGameState(g.status === 'in-progress' ? 'playing' : g.status === 'completed' ? 'finished' : 'waiting')
+        // currentTurn is ObjectId -> figure symbol from players
+        if (g.currentTurn) {
+          const current = g.players.find((p: any) => p.user._id?.toString?.() === g.currentTurn._id?.toString?.() || p.user?.toString?.() === g.currentTurn?.toString?.())
+          if (current?.symbol) setCurrentPlayer(current.symbol)
+        }
+
+        const s = initializeSocket(token)
+        joinGameRoom(gameId)
+        s.on('game-update', (game: any) => {
+          if (Array.isArray(game.board)) setBoard(game.board)
+          const cur = game.players.find((p: any) => p.user === game.currentTurn || p.user?._id === game.currentTurn?._id)
+          if (cur?.symbol) setCurrentPlayer(cur.symbol)
+          setGameState(game.status === 'in-progress' ? 'playing' : game.status === 'completed' ? 'finished' : 'waiting')
+        })
+        s.on('game-start', (game: any) => {
+          setGameState('playing')
+          if (Array.isArray(game.board)) setBoard(game.board)
+        })
+        s.on('game-over', (data: any) => {
+          setGameState('finished')
+        })
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    run()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, gameId])
 
   // Game timer
   useEffect(() => {
@@ -59,45 +111,38 @@ export default function TicTacToeGame() {
     }
   }, [gameState])
 
-  // Check for winner
+  // Client-side winner calculation only for local UX feedback
   useEffect(() => {
-    const winner = checkWinner(board)
-    if (winner) {
-      setWinner(winner)
-      setGameState("finished")
-    } else if (board.every((cell) => cell !== null)) {
-      setWinner("draw")
-      setGameState("finished")
-    }
-  }, [board])
-
-  const checkWinner = (board: Player[]): Winner => {
     const lines = [
       [0, 1, 2],
       [3, 4, 5],
-      [6, 7, 8], // rows
+      [6, 7, 8],
       [0, 3, 6],
       [1, 4, 7],
-      [2, 5, 8], // columns
+      [2, 5, 8],
       [0, 4, 8],
-      [2, 4, 6], // diagonals
+      [2, 4, 6],
     ]
-
-    for (const [a, b, c] of lines) {
+    for (const [a,b,c] of lines) {
       if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-        return board[a]
+        setWinner(board[a])
+        setGameState('finished')
+        return
       }
     }
-    return null
-  }
+    if (board.every((cell) => cell !== null)) {
+      setWinner('draw')
+      setGameState('finished')
+    }
+  }, [board])
 
   const handleCellClick = (index: number) => {
     if (board[index] || gameState !== "playing" || winner) return
-
-    const newBoard = [...board]
-    newBoard[index] = currentPlayer
-    setBoard(newBoard)
-    setCurrentPlayer(currentPlayer === "X" ? "O" : "X")
+    if (!token) return
+    // Convert index -> row/col
+    const row = Math.floor(index / 3)
+    const col = index % 3
+    socketMakeMove({ row, col })
   }
 
   const resetGame = () => {
@@ -124,7 +169,7 @@ export default function TicTacToeGame() {
   }
 
   const getCurrentPlayerInfo = () => {
-    return roomData.players.find((p) => p.symbol === currentPlayer)
+    return roomData.players.find((p: any) => p.symbol === currentPlayer)
   }
 
   return (
@@ -197,6 +242,14 @@ export default function TicTacToeGame() {
                     <span className="text-sm text-muted-foreground">{roomData.spectators} watching</span>
                   </div>
                 </div>
+
+                {gameState === "waiting" && (
+                  <div className="mb-6 flex items-center justify-center gap-4">
+                    <Button onClick={() => socketReady()} className="bg-primary hover:bg-primary/90 glow-hover">
+                      Ready Up
+                    </Button>
+                  </div>
+                )}
 
                 {gameState === "finished" && (
                   <div className="mb-6">

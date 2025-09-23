@@ -21,4 +21,6 @@ export const API_ROUTES = {
   GAME_STATE: (gameId: string) => `/games/${gameId}`,
   MAKE_MOVE: (gameId: string) => `/games/${gameId}/move`,
   PLAYER_READY: (gameId: string) => `/games/${gameId}/ready`,
+  // Single-player
+  CREATE_SINGLE: '/games/single-player',
 };

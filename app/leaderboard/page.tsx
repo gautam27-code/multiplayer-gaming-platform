@@ -23,6 +23,9 @@ import {
   Filter,
 } from "lucide-react"
 import Link from "next/link"
+import { useEffect } from "react"
+import { useAuthStore } from "@/lib/stores/auth"
+import { userApi } from "@/lib/api"
 
 interface Player {
   id: string
@@ -49,97 +52,36 @@ export default function LeaderboardPage() {
   const [timeFilter, setTimeFilter] = useState("all-time")
   const [gameFilter, setGameFilter] = useState("all")
 
-  const [globalLeaderboard] = useState<Player[]>([
-    {
-      id: "1",
-      username: "ProGamer2024",
-      avatar: "/placeholder.svg?key=top1",
-      rank: 1,
-      points: 4850,
-      wins: 127,
-      losses: 23,
-      winRate: 84.7,
-      gamesPlayed: 150,
-      streak: 12,
-      rankChange: "same",
-      level: 25,
-      title: "Grand Master",
-    },
-    {
-      id: "2",
-      username: "TacToeKing",
-      avatar: "/placeholder.svg?key=top2",
-      rank: 2,
-      points: 4720,
-      wins: 115,
-      losses: 28,
-      winRate: 80.4,
-      gamesPlayed: 143,
-      streak: 8,
-      rankChange: "up",
-      level: 23,
-      title: "Master",
-    },
-    {
-      id: "3",
-      username: "StrategyQueen",
-      avatar: "/placeholder.svg?key=top3",
-      rank: 3,
-      points: 4650,
-      wins: 108,
-      losses: 32,
-      winRate: 77.1,
-      gamesPlayed: 140,
-      streak: 5,
-      rankChange: "down",
-      level: 22,
-      title: "Master",
-    },
-    {
-      id: "4",
-      username: "player11",
-      avatar: "/placeholder.svg?key=player11",
-      rank: 1247,
-      points: 2840,
-      wins: 89,
-      losses: 38,
-      winRate: 70.1,
-      gamesPlayed: 127,
-      streak: 3,
-      rankChange: "up",
-      level: 15,
-    },
-    {
-      id: "5",
-      username: "GameMaster99",
-      avatar: "/placeholder.svg?key=top5",
-      rank: 4,
-      points: 4580,
-      wins: 102,
-      losses: 35,
-      winRate: 74.5,
-      gamesPlayed: 137,
-      streak: 7,
-      rankChange: "up",
-      level: 21,
-      title: "Expert",
-    },
-    {
-      id: "6",
-      username: "WinStreak",
-      avatar: "/placeholder.svg?key=top6",
-      rank: 5,
-      points: 4420,
-      wins: 98,
-      losses: 39,
-      winRate: 71.5,
-      gamesPlayed: 137,
-      streak: 15,
-      rankChange: "same",
-      level: 20,
-      title: "Expert",
-    },
-  ])
+  const [globalLeaderboard, setGlobalLeaderboard] = useState<Player[]>([])
+  const { token } = useAuthStore()
+
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      try {
+        if (!token) return
+        const list: any[] = await userApi.getLeaderboard(token)
+        const mapped: Player[] = list.map((u: any, idx: number) => ({
+          id: u._id,
+          username: u.username,
+          avatar: "/placeholder.svg",
+          rank: idx + 1,
+          points: Math.round((u.stats?.wins || 0) * 10 + (u.stats?.matchesPlayed || 0)),
+          wins: u.stats?.wins || 0,
+          losses: u.stats?.losses || 0,
+          winRate: Math.round((u.stats?.winRate || 0) * 10) / 10,
+          gamesPlayed: u.stats?.matchesPlayed || 0,
+          streak: 0,
+          rankChange: "same",
+          level: Math.max(1, Math.floor((u.stats?.wins || 0) / 5)),
+          title: undefined,
+        }))
+        setGlobalLeaderboard(mapped)
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    fetchLeaderboard()
+  }, [token])
 
   const [gameStats] = useState<GameStats[]>([
     {

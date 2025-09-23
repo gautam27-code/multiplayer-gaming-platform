@@ -57,19 +57,35 @@ export default function CreateRoom() {
     }))
   }
 
+  const { token } = require("@/lib/stores/auth").useAuthStore()
+  const { gameApi } = require("@/lib/api")
+
   const handleCreateRoom = async () => {
     if (!formData.name || !formData.game) {
       return
     }
 
     setIsCreating(true)
-
-    // Simulate room creation
-    setTimeout(() => {
+    try {
+      const typeMap: Record<string, string> = {
+        'tic-tac-toe': 'tic-tac-toe',
+        'chess': 'chess',
+        'connect-4': 'connect4',
+      }
+      const payload = {
+        name: formData.name,
+        type: typeMap[formData.game] || 'tic-tac-toe',
+      }
+      const res = await gameApi.createRoom(token, payload as any)
+      const gameId = (res as any).game?._id
+      if (gameId) {
+        router.push(`/game/${gameId}`)
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
       setIsCreating(false)
-      // Navigate to the created room
-      router.push(`/game/room-${Date.now()}`)
-    }, 2000)
+    }
   }
 
   return (

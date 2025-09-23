@@ -122,6 +122,14 @@ export const gameApi = {
       body: JSON.stringify(data),
     }),
 
+  // Single-player
+  createSinglePlayer: (token: string, data?: { name?: string; type?: string }) =>
+    fetchApi('/games/single-player', {
+      method: 'POST',
+      token,
+      body: JSON.stringify(data || {}),
+    }),
+
   getAvailableRooms: (token: string) =>
     fetchApi('/games/rooms', { token }),
 

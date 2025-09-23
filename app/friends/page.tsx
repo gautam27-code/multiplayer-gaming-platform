@@ -22,6 +22,9 @@ import {
   MoreHorizontal,
 } from "lucide-react"
 import Link from "next/link"
+import { useEffect } from "react"
+import { useAuthStore } from "@/lib/stores/auth"
+import { authApi } from "@/lib/api"
 
 type FriendStatus = "online" | "in-game" | "offline"
 type RequestStatus = "pending" | "sent"
@@ -51,78 +54,41 @@ export default function FriendsPage() {
   const [searchResults, setSearchResults] = useState<Friend[]>([])
   const [isSearching, setIsSearching] = useState(false)
 
-  const [friends] = useState<Friend[]>([
-    {
-      id: "1",
-      username: "player22",
-      avatar: "/placeholder.svg?key=friend1",
-      status: "online",
-      level: 15,
-      winRate: 78,
-    },
-    {
-      id: "2",
-      username: "player33",
-      avatar: "/placeholder.svg?key=friend2",
-      status: "in-game",
-      currentGame: "Tic-Tac-Toe",
-      level: 12,
-      winRate: 65,
-    },
-    {
-      id: "3",
-      username: "player44",
-      avatar: "/placeholder.svg?key=friend3",
-      status: "offline",
-      lastSeen: "2 hours ago",
-      level: 8,
-      winRate: 82,
-    },
-    {
-      id: "4",
-      username: "player55",
-      avatar: "/placeholder.svg?key=friend4",
-      status: "online",
-      level: 20,
-      winRate: 91,
-    },
-    {
-      id: "5",
-      username: "player66",
-      avatar: "/placeholder.svg?key=friend5",
-      status: "offline",
-      lastSeen: "1 day ago",
-      level: 6,
-      winRate: 45,
-    },
-  ])
+  const [friends, setFriends] = useState<Friend[]>([])
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([])
+  const { token } = useAuthStore()
 
-  const [friendRequests] = useState<FriendRequest[]>([
-    {
-      id: "1",
-      username: "player77",
-      avatar: "/placeholder.svg?key=req1",
-      type: "pending",
-      sentAt: "2 hours ago",
-      mutualFriends: 3,
-    },
-    {
-      id: "2",
-      username: "player88",
-      avatar: "/placeholder.svg?key=req2",
-      type: "pending",
-      sentAt: "1 day ago",
-      mutualFriends: 1,
-    },
-    {
-      id: "3",
-      username: "player99",
-      avatar: "/placeholder.svg?key=req3",
-      type: "sent",
-      sentAt: "3 days ago",
-      mutualFriends: 0,
-    },
-  ])
+  useEffect(() => {
+    const fetchSocial = async () => {
+      try {
+        if (!token) return
+        const profile: any = await authApi.getProfile(token)
+        const mappedFriends: Friend[] = (profile.friends || []).map((f: any) => ({
+          id: f.user._id,
+          username: f.user.username,
+          avatar: "/placeholder.svg",
+          status: f.user.isOnline ? (f.user.currentGame ? "in-game" : "online") : "offline",
+          lastSeen: f.user.lastActive ? new Date(f.user.lastActive).toLocaleString() : undefined,
+          currentGame: f.user.currentGame ? "Tic-Tac-Toe" : undefined,
+          level: Math.max(1, Math.floor((f.user.stats?.wins || 0) / 5)),
+          winRate: Math.round((f.user.stats?.winRate || 0) * 10) / 10,
+        }))
+        setFriends(mappedFriends)
+        const mappedReqs: FriendRequest[] = (profile.friendRequests || []).map((r: any) => ({
+          id: r._id,
+          username: r.from?.username || 'player',
+          avatar: "/placeholder.svg",
+          type: r.status === 'pending' ? 'pending' : 'sent',
+          sentAt: '',
+          mutualFriends: 0,
+        }))
+        setFriendRequests(mappedReqs)
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    fetchSocial()
+  }, [token])
 
   const onlineFriends = friends.filter((f) => f.status === "online")
   const inGameFriends = friends.filter((f) => f.status === "in-game")

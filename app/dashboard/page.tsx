@@ -24,6 +24,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useAuthStore } from "@/lib/stores/auth"
+import { authApi } from "@/lib/api"
 
 export default function Dashboard() {
   const router = useRouter();
@@ -62,6 +63,34 @@ export default function Dashboard() {
       }));
     }
   }, [user]);
+
+  // Refresh profile on mount to reflect latest stats
+  useEffect(() => {
+    const refresh = async () => {
+      try {
+        const token = (require("@/lib/stores/auth").useAuthStore.getState().token) as string | null
+        if (!token) return
+        const fresh = await authApi.getProfile(token)
+        if (fresh) {
+          setPlayerData(prev => ({
+            ...prev,
+            username: fresh.username,
+            stats: {
+              matchesPlayed: fresh.stats?.matchesPlayed || 0,
+              wins: fresh.stats?.wins || 0,
+              losses: fresh.stats?.losses || 0,
+              winRate: fresh.stats?.winRate || 0,
+              globalRank: fresh.stats?.globalRank || 0,
+              points: fresh.stats?.points || 0,
+            }
+          }))
+        }
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    refresh()
+  }, [])
 
   // Protect the dashboard route
   useEffect(() => {
@@ -300,7 +329,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* Quick Actions */}
-                <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Link href="/rooms/create">
                     <Button variant="outline" className="w-full glass border-white/20 glow-hover bg-transparent">
                       <Plus className="w-4 h-4 mr-2" />
@@ -311,6 +340,12 @@ export default function Dashboard() {
                     <Button variant="outline" className="w-full glass border-white/20 glow-hover bg-transparent">
                       <Search className="w-4 h-4 mr-2" />
                       Browse Rooms
+                    </Button>
+                  </Link>
+                  <Link href="/single-player">
+                    <Button variant="outline" className="w-full glass border-white/20 glow-hover bg-transparent">
+                      <Gamepad2 className="w-4 h-4 mr-2" />
+                      Play Solo
                     </Button>
                   </Link>
                 </div>
