@@ -61,12 +61,12 @@ export default function TicTacToeGame() {
         setRoomData({
           id: g._id,
           name: g.name,
-          players: (g.players || []).map((p: any) => ({
+          players: (g.players || []).map((p: any, idx: number) => ({
             id: p.user._id?.toString?.() || p.user,
             username: p.user.username || 'Player',
             avatar: '/placeholder.svg',
-            symbol: p.symbol || null,
-            isHost: false,
+            symbol: p.symbol || (idx === 0 ? 'X' : 'O'),
+            isHost: idx === 0,
           })),
           spectators: 0,
         })
@@ -82,9 +82,23 @@ export default function TicTacToeGame() {
         joinGameRoom(gameId)
         s.on('game-update', (game: any) => {
           if (Array.isArray(game.board)) setBoard(game.board)
-          const cur = game.players.find((p: any) => p.user === game.currentTurn || p.user?._id === game.currentTurn?._id)
+          const cur = (game.players || []).find((p: any) => (
+            (typeof p.user === 'string' && p.user === game.currentTurn) ||
+            (p.user?._id && p.user?._id === game.currentTurn?._id)
+          ))
           if (cur?.symbol) setCurrentPlayer(cur.symbol)
           setGameState(game.status === 'in-progress' ? 'playing' : game.status === 'completed' ? 'finished' : 'waiting')
+          // Keep sidebar players in sync without duplicates
+          setRoomData((prev: any) => ({
+            ...prev,
+            players: (game.players || []).map((p: any, idx: number) => ({
+              id: p.user?._id || p.user,
+              username: p.user?.username || 'Player',
+              avatar: '/placeholder.svg',
+              symbol: p.symbol || (idx === 0 ? 'X' : 'O'),
+              isHost: idx === 0,
+            })),
+          }))
         })
         s.on('game-start', (game: any) => {
           setGameState('playing')
@@ -98,6 +112,12 @@ export default function TicTacToeGame() {
       }
     }
     run()
+    return () => {
+      try {
+        // emit leave-game and cleanup room on unmount
+        require("@/lib/api/socket").leaveGameRoom()
+      } catch {}
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, gameId])
 

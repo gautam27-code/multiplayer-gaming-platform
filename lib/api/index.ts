@@ -142,16 +142,22 @@ export const gameApi = {
   getGameState: (token: string, gameId: string) =>
     fetchApi(`/games/${gameId}`, { token }),
 
-  makeMove: (token: string, gameId: string, position: any) =>
+  makeMove: (token: string, gameId: string, { row, col }: { row: number; col: number }) =>
     fetchApi(`/games/${gameId}/move`, {
       method: 'POST',
       token,
-      body: JSON.stringify({ position }),
+      body: JSON.stringify({ row, col }),
     }),
 
   setPlayerReady: (token: string, gameId: string) =>
     fetchApi(`/games/${gameId}/ready`, {
       method: 'PUT',
+      token,
+    }),
+
+  leaveGame: (token: string, gameId: string) =>
+    fetchApi(`/games/${gameId}/leave`, {
+      method: 'DELETE',
       token,
     }),
 };

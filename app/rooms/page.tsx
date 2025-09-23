@@ -27,19 +27,23 @@ export default function GameRooms() {
     try {
       setIsLoading(true)
       const data = await gameApi.getAvailableRooms(token)
-      // Map API rooms to UI format
-      const mapped = (data as any[]).map((g) => ({
-        id: g._id,
-        roomCode: g.roomCode,
-        name: g.name,
-        game: g.type === 'tic-tac-toe' ? 'Tic-Tac-Toe' : g.type,
-        host: g.players?.[0]?.user?.username || 'host',
-        players: g.players?.length || 1,
-        maxPlayers: 2,
-        status: 'waiting',
-        isPrivate: false,
-        createdAt: new Date(g.createdAt).toLocaleTimeString(),
-      }))
+      // Map API rooms to UI format (show waiting and in-progress)
+      const mapped = (data as any[]).map((g) => {
+        const playersCount = Array.isArray(g.players) ? g.players.length : 0
+        const status = g.status === 'in-progress' ? 'playing' : 'waiting'
+        return {
+          id: g._id,
+          roomCode: g.roomCode,
+          name: g.name,
+          game: g.type === 'tic-tac-toe' ? 'Tic-Tac-Toe' : g.type,
+          host: g.players?.[0]?.user?.username || 'host',
+          players: playersCount,
+          maxPlayers: 2,
+          status: playersCount >= 2 ? 'full' : status,
+          isPrivate: false,
+          createdAt: new Date(g.createdAt).toLocaleTimeString(),
+        }
+      })
       setRooms(mapped)
     } catch (e) {
       console.error(e)
@@ -316,7 +320,7 @@ export default function GameRooms() {
 
                       <Button
                         onClick={() => handleJoinRoom(room)}
-                        disabled={room.status === "full" || room.status === "playing" || isLoading}
+                        disabled={room.status !== "waiting" || isLoading}
                         className={`${room.status === "waiting" ? "bg-primary hover:bg-primary/90 glow-hover" : ""}`}
                         variant={room.status === "waiting" ? "default" : "outline"}
                       >

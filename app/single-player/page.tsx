@@ -8,7 +8,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Gamepad2, RotateCcw, Trophy } from "lucide-react"
 import { useAuthStore } from "@/lib/stores/auth"
-import { gameApi } from "@/lib/api"
+import { authApi, gameApi } from "@/lib/api"
+import { toast } from "sonner"
+
+interface PlayerStats {
+  matchesPlayed: number
+  wins: number
+  losses: number
+  ties?: number
+  winRate: number
+  globalRank?: number
+  points?: number
+}
 
 // Simple tic-tac-toe single-player page vs AI
 export default function SinglePlayerPage() {
@@ -20,6 +31,7 @@ export default function SinglePlayerPage() {
   const [status, setStatus] = useState<'loading'|'playing'|'finished'>('loading')
   const [winner, setWinner] = useState<"X"|"O"|"draw"|null>(null)
   const [currentSymbol, setCurrentSymbol] = useState<"X"|"O">('X')
+  const [isBusy, setIsBusy] = useState(false)
 
   useEffect(() => {
     const start = async () => {
@@ -32,15 +44,66 @@ export default function SinglePlayerPage() {
         const g = res.game
         setGameId(g._id)
         setBoard(Array.isArray(g.board) ? g.board : Array(9).fill(null))
-        setStatus('playing')
+        setStatus(g.status === 'completed' ? 'finished' : 'playing')
         // currentTurn belongs to user -> symbol X
         setCurrentSymbol('X')
-      } catch (e) {
+      } catch (e: any) {
         console.error(e)
+        const msg = e?.message || 'Failed to start single-player game'
+        toast.error(msg)
+        setStatus('finished')
       }
     }
     start()
   }, [token, router])
+
+  // Poll game state while playing to avoid any client desync
+  useEffect(() => {
+    if (!token || !gameId || status !== 'playing') return
+    
+    let isSubscribed = true
+    const id = setInterval(async () => {
+      try {
+        const g: any = await gameApi.getGameState(token, gameId)
+        if (!isSubscribed) return
+        
+        if (Array.isArray(g.board)) {
+          setBoard(g.board)
+          // Check if game completed
+          if (g.status === 'completed') {
+            setStatus('finished')
+            if (g.result === 'draw') setWinner('draw')
+            else if (g.winner) setWinner('X')
+            else setWinner('O')
+
+            // Refresh profile for updated stats
+            try {
+              const fresh = await authApi.getProfile(token)
+              const userStats = fresh as { stats: PlayerStats }
+              if (userStats?.stats && isSubscribed) {
+                useAuthStore.setState((state: any) => ({
+                  ...state,
+                  user: {
+                    ...state.user,
+                    stats: userStats.stats
+                  }
+                }))
+              }
+            } catch (err) {
+              console.error('Failed to refresh profile', err)
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Game state polling error:', err)
+      }
+    }, 1000)
+
+    return () => {
+      isSubscribed = false
+      clearInterval(id)
+    }
+  }, [token, gameId, status])
 
   const checkLocalWinner = (b: ("X"|"O"|null)[]) => {
     const lines = [
@@ -61,23 +124,60 @@ export default function SinglePlayerPage() {
     if (!gameId || !token) return
     if (status !== 'playing') return
     if (board[index] !== null) return
+    if (isBusy) return
 
     const row = Math.floor(index/3)
     const col = index % 3
+    
+    // Validate position before sending
+    if (row < 0 || row >= 3 || col < 0 || col >= 3) {
+      toast.error('Invalid position');
+      return;
+    }
 
     try {
+      setIsBusy(true)
       const res: any = await gameApi.makeMove(token, gameId, { row, col })
       const g = res.game
-      if (Array.isArray(g.board)) setBoard(g.board)
-      if (g.status === 'completed') {
-        setStatus('finished')
-        // derive winner: if result=draw keep draw else figure from board changes; backend sets winner null on AI win
-        if (g.result === 'draw') setWinner('draw')
-        else if (g.winner) setWinner('X')
-        else setWinner('O')
+      
+      // Update board state
+      if (Array.isArray(g.board)) {
+        setBoard(g.board)
+        // Check if game completed
+        if (g.status === 'completed') {
+          setStatus('finished')
+          // Determine winner
+          if (g.result === 'draw') {
+            setWinner('draw')
+          } else if (g.winner) {
+            setWinner('X') // Human won
+          } else {
+            setWinner('O') // Computer won
+          }
+
+          // Refresh profile to reflect updated stats
+          try {
+            const fresh = await authApi.getProfile(token)
+            const userStats = fresh as { stats: PlayerStats }
+            if (userStats?.stats) {
+              useAuthStore.setState((state: any) => ({ 
+                ...state, 
+                user: { 
+                  ...state.user, 
+                  stats: userStats.stats
+                } 
+              }))
+            }
+          } catch (err) {
+            console.error('Failed to refresh profile', err)
+          }
+        }
       }
-    } catch (e) {
-      console.error(e)
+    } catch (e: any) {
+      console.error('Move error:', e)
+      toast.error(e?.message || 'Move failed')
+    } finally {
+      setIsBusy(false)
     }
   }
 
@@ -124,13 +224,17 @@ export default function SinglePlayerPage() {
                   {board.map((cell, i) => (
                     <button key={i}
                       onClick={() => handleCellClick(i)}
-                      disabled={status !== 'playing' || cell !== null}
-                      className={`aspect-square w-full h-24 rounded-xl glass border-white/20 flex items-center justify-center text-4xl font-bold transition-all duration-300 hover:scale-105 glow-hover ${cell === 'X' ? 'text-primary' : 'text-accent'}`}
+                      disabled={status !== 'playing' || cell !== null || isBusy}
+                      className={`aspect-square w-full h-24 rounded-xl glass border-white/20 flex items-center justify-center text-4xl font-bold transition-all duration-300 hover:scale-105 glow-hover ${cell === 'X' ? 'text-primary' : 'text-accent'} ${isBusy ? 'opacity-70 cursor-wait' : ''}`}
                     >
                       {cell}
                     </button>
                   ))}
                 </div>
+
+                {isBusy && status === 'playing' && (
+                  <div className="text-sm text-muted-foreground">Computer is thinking…</div>
+                )}
 
                 {status === 'finished' && (
                   <div className="text-center space-y-4">

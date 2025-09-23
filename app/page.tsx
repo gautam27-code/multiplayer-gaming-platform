@@ -17,7 +17,7 @@ const FloatingCharacter = ({ emoji, delay = 0 }: { emoji: string; delay?: number
   
   return (
     <div
-      className={`text-6xl cursor-pointer transition-all duration-300 ease-out transform hover:scale-110 ${
+      className={`text-5xl cursor-pointer transition-all duration-300 ease-out transform hover:scale-110 ${
         isHovered ? 'animate-bounce' : 'animate-pulse'
       }`}
       style={{
@@ -34,17 +34,14 @@ const FloatingCharacter = ({ emoji, delay = 0 }: { emoji: string; delay?: number
 
 export default function AuthPage() {
   const router = useRouter()
-  const { login, register, isLoading, error, message } = useAuthStore()
+  const { login, register, isLoading, error } = useAuthStore()
 
-  // Handle auth messages (both errors and success)
+  // Show error toast when auth error occurs
   useEffect(() => {
     if (error) {
-      toast.error(error);
+      toast.error(error)
     }
-    if (message) {
-      toast.success(message);
-    }
-  }, [error, message])
+  }, [error])
 
   const handleAuth = async (type: "login" | "signup", formData: FormData) => {
     try {
@@ -59,7 +56,7 @@ export default function AuthPage() {
         await register(username, email, password)
       }
       router.push("/dashboard")
-      // Success toast will be shown via the auth store's message
+      toast.success(`Successfully ${type === "login" ? "logged in" : "registered"}!`)
     } catch (err) {
       console.error(err)
       // Error is handled by the auth store and shown via useEffect
@@ -253,13 +250,15 @@ export default function AuthPage() {
         </Card>
       </div>
 
-      {/* Floating Gaming Characters */}
-      <div className="fixed bottom-8 left-0 right-0 flex justify-center space-x-8 pointer-events-auto z-20">
-        <FloatingCharacter emoji="🎮" delay={0} />
-        <FloatingCharacter emoji="🕹️" delay={200} />
-        <FloatingCharacter emoji="🎯" delay={400} />
-        <FloatingCharacter emoji="🏆" delay={600} />
-        <FloatingCharacter emoji="⚡" delay={800} />
+      {/* Floating Gaming Characters - Right Side */}
+      <div className="fixed right-8 top-1/2 transform -translate-y-1/2 z-20 hidden lg:block">
+        <div className="flex flex-col space-y-6">
+          <FloatingCharacter emoji="🎮" delay={0} />
+          <FloatingCharacter emoji="🕹️" delay={200} />
+          <FloatingCharacter emoji="🎯" delay={400} />
+          <FloatingCharacter emoji="🏆" delay={600} />
+          <FloatingCharacter emoji="⚡" delay={800} />
+        </div>
       </div>
 
       <style jsx>{`
