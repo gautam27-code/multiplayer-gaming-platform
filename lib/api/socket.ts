@@ -49,20 +49,30 @@ export const initializeSocket = (token: string): GameSocket => {
   if (!socket) {
     socket = io(API_BASE_URL.replace('/api', ''), {
       auth: { token },
-      transports: ['websocket'],
+      // Force HTTP long-polling; disable upgrade attempts to WebSocket to avoid errors on hosts
+      // that don't support native WS upgrades (e.g., some serverless environments).
+      transports: ['polling'],
+      upgrade: false,
+      path: '/socket.io',
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      timeout: 20000,
     }) as GameSocket;
 
     // Socket event listeners
     socket.on('connect', () => {
-      console.log('Connected to game server');
+      // @ts-ignore - access to engine transport name for debug
+      const transport = (socket as any).io?.engine?.transport?.name;
+      console.log('Connected to game server', transport ? `(transport: ${transport})` : '');
     });
 
     socket.on('error', (error: { message: string }) => {
       console.error('Socket error:', error);
     });
 
-    socket.on('disconnect', () => {
-      console.log('Disconnected from game server');
+    socket.on('disconnect', (reason: string) => {
+      console.log('Disconnected from game server:', reason);
     });
   }
   return socket;
