@@ -107,6 +107,27 @@ export default function TicTacToeGame() {
         s.on('game-over', (data: any) => {
           setGameState('finished')
         })
+        s.on('player-ready-update', (payload: any) => {
+          const game = payload?.game || payload
+          if (game) {
+            if (Array.isArray(game.players)) {
+              setRoomData((prev: any) => ({
+                ...prev,
+                players: (game.players || []).map((p: any, idx: number) => ({
+                  id: p.user?._id || p.user,
+                  username: p.user?.username || 'Player',
+                  avatar: '/placeholder.svg',
+                  symbol: p.symbol || (idx === 0 ? 'X' : 'O'),
+                  isHost: idx === 0,
+                })),
+              }))
+            }
+            if (game.status === 'in-progress') {
+              setGameState('playing')
+              if (Array.isArray(game.board)) setBoard(game.board)
+            }
+          }
+        })
       } catch (e) {
         console.error(e)
       }
@@ -265,7 +286,34 @@ export default function TicTacToeGame() {
 
                 {gameState === "waiting" && (
                   <div className="mb-6 flex items-center justify-center gap-4">
-                    <Button onClick={() => socketReady()} className="bg-primary hover:bg-primary/90 glow-hover">
+                    <Button onClick={async () => {
+                      try {
+                        // Try realtime first
+                        socketReady()
+                        // Also call REST as a fallback to ensure readiness is persisted and game starts
+                        if (token) {
+                          const resp: any = await gameApi.setPlayerReady(token, gameId)
+                          const game = resp?.game || resp
+                          if (game) {
+                            if (Array.isArray(game.board)) setBoard(game.board)
+                            if (game.status === 'in-progress') setGameState('playing')
+                            // sync players list
+                            setRoomData((prev: any) => ({
+                              ...prev,
+                              players: (game.players || []).map((p: any, idx: number) => ({
+                                id: p.user?._id || p.user,
+                                username: p.user?.username || 'Player',
+                                avatar: '/placeholder.svg',
+                                symbol: p.symbol || (idx === 0 ? 'X' : 'O'),
+                                isHost: idx === 0,
+                              })),
+                            }))
+                          }
+                        }
+                      } catch (e) {
+                        console.error(e)
+                      }
+                    }} className="bg-primary hover:bg-primary/90 glow-hover">
                       Ready Up
                     </Button>
                   </div>
