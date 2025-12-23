@@ -107,6 +107,12 @@ export const setPlayerReady = () => {
   }
 };
 
+export const playAgain = () => {
+  if (socket && socket.gameId) {
+    socket.emit('play-again', socket.gameId);
+  }
+};
+
 export const disconnectSocket = () => {
   if (socket) {
     socket.disconnect();
@@ -120,5 +126,6 @@ export default {
   leaveGameRoom,
   makeMove,
   setPlayerReady,
+  playAgain,
   disconnectSocket,
 };

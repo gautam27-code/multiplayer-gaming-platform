@@ -23,7 +23,7 @@ import Link from "next/link"
 import { useParams } from "next/navigation"
 
 import { useAuthStore } from "@/lib/stores/auth"
-import socketSvc, { initializeSocket, joinGameRoom, makeMove as socketMakeMove, setPlayerReady as socketReady } from "@/lib/api/socket"
+import socketSvc, { initializeSocket, joinGameRoom, makeMove as socketMakeMove, setPlayerReady as socketReady, playAgain } from "@/lib/api/socket"
 import { gameApi } from "@/lib/api"
 
 type Player = "X" | "O" | null
@@ -33,7 +33,7 @@ type Winner = "X" | "O" | "draw" | null
 export default function TicTacToeGame() {
   const params = useParams()
   const gameId = params.roomId as string
-  const { token } = useAuthStore()
+  const { token, user, refreshProfile } = useAuthStore()
 
   // Game state
   const [board, setBoard] = useState<Player[]>(Array(9).fill(null))
@@ -62,8 +62,8 @@ export default function TicTacToeGame() {
           id: g._id,
           name: g.name,
           players: (g.players || []).map((p: any, idx: number) => ({
-            id: p.user._id?.toString?.() || p.user,
-            username: p.user.username || 'Player',
+            id: p.user?._id?.toString?.() || p.user || 'ai',
+            username: p.ai ? 'AI Bot' : (p.user?.username || 'Player'),
             avatar: '/placeholder.svg',
             symbol: p.symbol || (idx === 0 ? 'X' : 'O'),
             isHost: idx === 0,
@@ -92,20 +92,30 @@ export default function TicTacToeGame() {
           setRoomData((prev: any) => ({
             ...prev,
             players: (game.players || []).map((p: any, idx: number) => ({
-              id: p.user?._id || p.user,
-              username: p.user?.username || 'Player',
+              id: p.user?._id || p.user || 'ai',
+              username: p.ai ? 'AI Bot' : (p.user?.username || 'Player'),
               avatar: '/placeholder.svg',
               symbol: p.symbol || (idx === 0 ? 'X' : 'O'),
               isHost: idx === 0,
             })),
           }))
+
+          // Handle reset state from game-update (if reset occurred)
+          if (game.status === 'in-progress' && !game.winner && !game.result && game.moves?.length === 0) {
+            setWinner(null)
+            setGameTime(0)
+            setGameState('playing')
+          }
         })
         s.on('game-start', (game: any) => {
           setGameState('playing')
           if (Array.isArray(game.board)) setBoard(game.board)
+          setWinner(null)
+          setGameTime(0)
         })
         s.on('game-over', (data: any) => {
           setGameState('finished')
+          refreshProfile()
         })
         s.on('player-ready-update', (payload: any) => {
           const game = payload?.game || payload
@@ -114,8 +124,8 @@ export default function TicTacToeGame() {
               setRoomData((prev: any) => ({
                 ...prev,
                 players: (game.players || []).map((p: any, idx: number) => ({
-                  id: p.user?._id || p.user,
-                  username: p.user?.username || 'Player',
+                  id: p.user?._id || p.user || 'ai',
+                  username: p.ai ? 'AI Bot' : (p.user?.username || 'Player'),
                   avatar: '/placeholder.svg',
                   symbol: p.symbol || (idx === 0 ? 'X' : 'O'),
                   isHost: idx === 0,
@@ -137,7 +147,7 @@ export default function TicTacToeGame() {
       try {
         // emit leave-game and cleanup room on unmount
         require("@/lib/api/socket").leaveGameRoom()
-      } catch {}
+      } catch { }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, gameId])
@@ -154,6 +164,9 @@ export default function TicTacToeGame() {
 
   // Client-side winner calculation only for local UX feedback
   useEffect(() => {
+    // Only verify win if game is NOT already finished by server logic
+    if (gameState === 'finished') return;
+
     const lines = [
       [0, 1, 2],
       [3, 4, 5],
@@ -164,9 +177,9 @@ export default function TicTacToeGame() {
       [0, 4, 8],
       [2, 4, 6],
     ]
-    for (const [a,b,c] of lines) {
+    for (const [a, b, c] of lines) {
       if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-        setWinner(board[a])
+        setWinner(board[a] as Winner)
         setGameState('finished')
         return
       }
@@ -175,7 +188,7 @@ export default function TicTacToeGame() {
       setWinner('draw')
       setGameState('finished')
     }
-  }, [board])
+  }, [board, gameState])
 
   const handleCellClick = (index: number) => {
     if (board[index] || gameState !== "playing" || winner) return
@@ -187,11 +200,7 @@ export default function TicTacToeGame() {
   }
 
   const resetGame = () => {
-    setBoard(Array(9).fill(null))
-    setCurrentPlayer("X")
-    setGameState("playing")
-    setWinner(null)
-    setGameTime(0)
+    playAgain()
   }
 
   const formatTime = (seconds: number) => {
@@ -203,8 +212,10 @@ export default function TicTacToeGame() {
   const getWinnerMessage = () => {
     if (winner === "draw") return "It's a Draw!"
     if (winner) {
-      const winnerPlayer = roomData.players.find((p) => p.symbol === winner)
-      return `${winnerPlayer?.username} Wins!`
+      const winnerPlayer = roomData.players.find((p: any) => p.symbol === winner)
+      if (user && winnerPlayer?.username === user.username) return "VICTORY!"
+      if (user && winnerPlayer?.username === 'AI Bot') return "DEFEAT!"
+      return `${winnerPlayer?.username || 'Opponent'} Wins!`
     }
     return ""
   }
@@ -358,9 +369,8 @@ export default function TicTacToeGame() {
                     >
                       {cell && (
                         <span
-                          className={`animate-in zoom-in-50 duration-300 ${
-                            cell === "X" ? "text-primary" : "text-accent"
-                          }`}
+                          className={`animate-in zoom-in-50 duration-300 ${cell === "X" ? "text-primary" : "text-accent"
+                            }`}
                         >
                           {cell}
                         </span>
@@ -383,14 +393,13 @@ export default function TicTacToeGame() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {roomData.players.map((player) => (
+                {roomData.players.map((player: any) => (
                   <div
                     key={player.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
-                      gameState === "playing" && currentPlayer === player.symbol
-                        ? "bg-primary/20 ring-2 ring-primary/50 glow"
-                        : "bg-card/50"
-                    }`}
+                    className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${gameState === "playing" && currentPlayer === player.symbol
+                      ? "bg-primary/20 ring-2 ring-primary/50 glow"
+                      : "bg-card/50"
+                      }`}
                   >
                     <Avatar className="w-10 h-10 ring-2 ring-primary/30">
                       <AvatarImage src={player.avatar || "/placeholder.svg"} />

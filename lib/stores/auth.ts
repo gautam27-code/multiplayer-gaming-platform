@@ -29,11 +29,12 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => void;
+  refreshProfile: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       token: null,
       user: null,
       isLoading: false,
@@ -49,13 +50,13 @@ export const useAuthStore = create<AuthState>()(
           }
 
           const response = await authApi.login({ email, password });
-          
+
           if (!response || typeof response !== 'object') {
             throw new Error('Invalid response from server');
           }
 
           const { token, user, message } = response as AuthResponse;
-          
+
           if (!token || !user) {
             throw new Error(message || 'Invalid response from server');
           }
@@ -104,7 +105,7 @@ export const useAuthStore = create<AuthState>()(
           }
 
           const response = await authApi.register({ username, email, password }) as AuthResponse;
-          
+
           if (!response.token || !response.user) {
             throw new Error('Invalid response from server');
           }
@@ -123,6 +124,19 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
           });
           throw error;
+        }
+      },
+
+      refreshProfile: async () => {
+        try {
+          const { token } = get();
+          if (!token) return;
+          const user: any = await authApi.getProfile(token);
+          if (user) {
+            set({ user: { ...user, id: user._id || user.id } });
+          }
+        } catch (error) {
+          console.error("Failed to refresh profile", error);
         }
       },
 
