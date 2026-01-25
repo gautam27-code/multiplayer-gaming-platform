@@ -49,10 +49,7 @@ export const initializeSocket = (token: string): GameSocket => {
   if (!socket) {
     socket = io(API_BASE_URL.replace('/api', ''), {
       auth: { token },
-      // Force HTTP long-polling; disable upgrade attempts to WebSocket to avoid errors on hosts
-      // that don't support native WS upgrades (e.g., some serverless environments).
-      transports: ['polling'],
-      upgrade: false,
+      transports: ['websocket'],
       path: '/socket.io',
       reconnection: true,
       reconnectionAttempts: 10,

@@ -149,9 +149,9 @@ export default function FuturisticDashboard() {
 
               <div className="flex items-center gap-4">
                 {[
-                  { icon: History, label: 'History', link: '/history' },
+                  { icon: History, label: 'History...', link: '/history' },
                   { icon: Users, label: 'Squad', link: '/friends' },
-                  { icon: Trophy, label: 'Arena', link: '/leaderboard' }
+                  { icon: Trophy, label: 'Leaderboard', link: '/leaderboard' },
                 ].map((item, i) => (
                   <Link key={i} href={item.link}>
                     <button className="group relative px-4 py-2 overflow-hidden rounded-lg border border-cyan-500/30 hover:border-cyan-400 transition-all hover:scale-105">
