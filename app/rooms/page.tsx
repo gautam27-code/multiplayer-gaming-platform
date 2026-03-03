@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -9,8 +9,6 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Gamepad2, Users, Search, Plus, ArrowLeft, Play, Crown, Target, Clock, Filter, RefreshCw } from "lucide-react"
 import Link from "next/link"
-
-import { useEffect } from "react"
 import { useAuthStore } from "@/lib/stores/auth"
 import { gameApi } from "@/lib/api"
 
@@ -22,19 +20,81 @@ export default function GameRooms() {
   const [rooms, setRooms] = useState<any[]>([])
   const { token } = useAuthStore()
 
+  // Animation States
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // 1. Mouse Follower Effect
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePos({ x: e.clientX, y: e.clientY });
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
+  // 2. Particle Canvas (Emerald/Lime Theme)
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Resize handler
+    const resizeCanvas = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    const particles: any[] = [];
+    for (let i = 0; i < 50; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: (Math.random() - 0.5) * 0.5,
+        radius: Math.random() * 2 + 1,
+        opacity: Math.random() * 0.5 + 0.2
+      });
+    }
+
+    let animationId: number;
+    function animate() {
+      if (!canvas || !ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(16, 185, 129, ${p.opacity})`;
+        ctx.fill();
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+        if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+      });
+      animationId = requestAnimationFrame(animate);
+    }
+    animate();
+
+    return () => {
+      cancelAnimationFrame(animationId);
+      window.removeEventListener('resize', resizeCanvas);
+    };
+  }, []);
+
   const fetchRooms = async () => {
     if (!token) return
     try {
       setIsLoading(true)
       const data = await gameApi.getAvailableRooms(token)
-      // Map API rooms to UI format (show waiting and in-progress)
       const mapped = (data as any[]).map((g) => {
         const playersCount = Array.isArray(g.players) ? g.players.length : 0
         const status = g.status === 'in-progress' ? 'playing' : 'waiting'
         return {
           id: g._id,
           roomCode: g.roomCode,
-          name: g.name,
+          name: g.name || 'Unnamed Room',
           game: g.type === 'tic-tac-toe' ? 'Tic-Tac-Toe' : g.type,
           host: g.players?.[0]?.user?.username || 'host',
           players: playersCount,
@@ -54,31 +114,15 @@ export default function GameRooms() {
 
   useEffect(() => {
     fetchRooms()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
 
   const filteredRooms = rooms.filter((room) => {
-    const matchesSearch =
-      room.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      room.host.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch = (room.name || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+      (room.host || "").toLowerCase().includes((searchTerm || "").toLowerCase())
     const matchesGame = gameFilter === "all" || room.game === gameFilter
     const matchesStatus = statusFilter === "all" || room.status === statusFilter
-
     return matchesSearch && matchesGame && matchesStatus
   })
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "waiting":
-        return "bg-green-500/20 text-green-500"
-      case "playing":
-        return "bg-yellow-500/20 text-yellow-500"
-      case "full":
-        return "bg-red-500/20 text-red-500"
-      default:
-        return "bg-gray-500/20 text-gray-500"
-    }
-  }
 
   const handleJoinRoom = async (room: any) => {
     if (!token) return
@@ -86,261 +130,178 @@ export default function GameRooms() {
       const joined = await gameApi.joinRoom(token, room.roomCode)
       const game = (joined as any).game
       window.location.href = `/game/${game._id}`
-    } catch (e) {
-      console.error(e)
-    }
+    } catch (e) { console.error(e) }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      {/* Background effects */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-20 right-20 w-64 h-64 bg-primary/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-20 left-20 w-64 h-64 bg-accent/10 rounded-full blur-3xl animate-pulse delay-1000" />
-      </div>
+    <div className="relative min-h-screen bg-black text-white overflow-x-hidden">
+      {/* Background Canvas */}
+      <canvas ref={canvasRef} className="fixed inset-0 z-0 pointer-events-none" />
 
-      {/* Navigation */}
-      <nav className="relative z-10 glass border-b border-white/10 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Link href="/dashboard">
-                <Button variant="ghost" size="sm" className="glow-hover">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Dashboard
-                </Button>
-              </Link>
-              <div className="flex items-center gap-2">
-                <Gamepad2 className="w-6 h-6 text-primary" />
-                <span className="text-lg font-bold">Game Rooms</span>
-              </div>
-            </div>
+      {/* Emerald/Green Gradient Overlays */}
+      <div className="fixed inset-0 bg-gradient-to-br from-emerald-500/10 via-transparent to-lime-500/10 z-0 pointer-events-none" />
+      <div className="fixed top-0 right-0 w-[800px] h-[800px] bg-emerald-500/20 rounded-full blur-[150px] animate-pulse z-0 pointer-events-none" />
+      <div className="fixed bottom-0 left-0 w-[600px] h-[600px] bg-lime-500/15 rounded-full blur-[150px] animate-pulse z-0 pointer-events-none" style={{ animationDelay: '1s' }} />
 
-            <Link href="/rooms/create">
-              <Button className="bg-primary hover:bg-primary/90 glow-hover">
-                <Plus className="w-4 h-4 mr-2" />
-                Create Room
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </nav>
+      {/* Cursor Glow */}
+      <div
+        className="fixed w-8 h-8 bg-emerald-400/30 rounded-full blur-xl pointer-events-none z-50 transition-transform duration-100"
+        style={{ left: mousePos.x - 16, top: mousePos.y - 16 }}
+      />
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Game Rooms</h1>
-          <p className="text-muted-foreground">Join existing rooms or create your own to play with friends</p>
-        </div>
-
-        {/* Filters */}
-        <Card className="glass glow-hover border-white/20 mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="w-5 h-5 text-primary" />
-              Filters & Search
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search rooms or players..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 glass border-white/20 focus:border-primary/50"
-                />
-              </div>
-
-              <Select value={gameFilter} onValueChange={setGameFilter}>
-                <SelectTrigger className="glass border-white/20">
-                  <SelectValue placeholder="All Games" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Games</SelectItem>
-                  <SelectItem value="Tic-Tac-Toe">Tic-Tac-Toe</SelectItem>
-                  <SelectItem value="Chess">Chess</SelectItem>
-                  <SelectItem value="Connect 4">Connect 4</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="glass border-white/20">
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="waiting">Waiting</SelectItem>
-                  <SelectItem value="playing">Playing</SelectItem>
-                  <SelectItem value="full">Full</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Button variant="outline" className="glass border-white/20 glow-hover bg-transparent" onClick={fetchRooms} disabled={isLoading}>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                {isLoading ? 'Refreshing…' : 'Refresh'}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Room Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card className="glass glow-hover border-white/20">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center">
-                  <Users className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">{rooms.length}</div>
-                  <div className="text-sm text-muted-foreground">Total Rooms</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="glass glow-hover border-white/20">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
-                  <Play className="w-5 h-5 text-green-500" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">{rooms.filter((r) => r.status === "waiting").length}</div>
-                  <div className="text-sm text-muted-foreground">Available</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="glass glow-hover border-white/20">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
-                  <Target className="w-5 h-5 text-yellow-500" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">{rooms.filter((r) => r.status === "playing").length}</div>
-                  <div className="text-sm text-muted-foreground">In Progress</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="glass glow-hover border-white/20">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-accent/20 rounded-lg flex items-center justify-center">
-                  <Crown className="w-5 h-5 text-accent" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">{rooms.reduce((acc, room) => acc + room.players, 0)}</div>
-                  <div className="text-sm text-muted-foreground">Active Players</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Rooms List */}
-        <div className="space-y-4">
-          {filteredRooms.length === 0 ? (
-            <Card className="glass glow-hover border-white/20">
-              <CardContent className="p-8 text-center">
-                <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Search className="w-8 h-8 text-muted-foreground" />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">No rooms found</h3>
-                <p className="text-muted-foreground mb-4">
-                  Try adjusting your filters or create a new room to get started
-                </p>
-                <Link href="/rooms/create">
-                  <Button className="bg-primary hover:bg-primary/90 glow-hover">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Room
+      <div className="relative z-10">
+        {/* Navigation */}
+        <nav className="sticky top-0 z-50 border-b border-emerald-500/30 backdrop-blur-xl bg-black/40">
+          <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-6">
+                <Link href="/dashboard">
+                  <Button variant="ghost" className="text-emerald-400 hover:text-white hover:bg-emerald-500/20 border border-emerald-500/20">
+                    <ArrowLeft className="w-4 h-4 mr-2" /> Back
                   </Button>
                 </Link>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredRooms.map((room) => (
-              <Card
-                key={room.id}
-                className="glass glow-hover border-white/20 transition-all duration-300 hover:scale-[1.02]"
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center">
-                        <Target className="w-6 h-6 text-primary" />
-                      </div>
+                <div className="flex items-center gap-2">
+                  <Gamepad2 className="w-8 h-8 text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+                  <span className="text-2xl font-black tracking-tighter bg-gradient-to-r from-emerald-400 to-lime-400 bg-clip-text text-transparent">COMBAT SECTORS</span>
+                </div>
+              </div>
+              <Link href="/rooms/create">
+                <Button className="bg-gradient-to-r from-emerald-500 to-emerald-700 hover:from-emerald-400 hover:to-emerald-600 text-white font-black shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all hover:scale-105">
+                  <Plus className="w-5 h-5 mr-2" /> INITIALIZE SECTOR
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </nav>
 
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-lg font-semibold">{room.name}</h3>
-                          {room.isPrivate && (
-                            <Badge variant="outline" className="text-xs">
-                              Private
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Gamepad2 className="w-4 h-4" />
-                            {room.game}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Avatar className="w-4 h-4">
-                              <AvatarFallback className="text-xs bg-primary/20 text-primary">
-                                {room.host.slice(0, 1).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            {room.host}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
-                            {room.createdAt}
-                          </span>
-                        </div>
-                      </div>
+        <div className="max-w-7xl mx-auto px-6 py-12">
+          {/* Header */}
+          <div className="mb-12">
+            <h1 className="text-5xl font-black bg-gradient-to-r from-emerald-400 via-lime-400 to-emerald-600 bg-clip-text text-transparent mb-2 uppercase tracking-tighter">
+              Available Sectors
+            </h1>
+            <p className="text-emerald-300/60 font-medium tracking-widest text-sm">SCANNING FOR ACTIVE MULTIPLAYER NODES...</p>
+          </div>
+
+          {/* Filters */}
+          <Card className="bg-black/60 backdrop-blur-xl border-emerald-500/20 rounded-3xl mb-12 p-2">
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="relative group">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500/50 group-hover:text-emerald-400 transition-colors" />
+                  <Input
+                    placeholder="Search Sectors..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 bg-emerald-500/5 border-emerald-500/20 text-emerald-100 placeholder:text-emerald-900 focus:border-emerald-400 transition-all"
+                  />
+                </div>
+                <Select value={gameFilter} onValueChange={setGameFilter}>
+                  <SelectTrigger className="bg-emerald-500/5 border-emerald-500/20 text-emerald-400">
+                    <SelectValue placeholder="All Games" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-900 border-emerald-500/20 text-emerald-100">
+                    <SelectItem value="all">All Games</SelectItem>
+                    <SelectItem value="Tic-Tac-Toe">Tic-Tac-Toe</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="bg-emerald-500/5 border-emerald-500/20 text-emerald-400">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-900 border-emerald-500/20 text-emerald-100">
+                    <SelectItem value="all">All States</SelectItem>
+                    <SelectItem value="waiting">Waiting</SelectItem>
+                    <SelectItem value="playing">Occupied</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10" onClick={fetchRooms} disabled={isLoading}>
+                  <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                  SYNC DATA
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+            {[
+              { label: 'Total Sectors', val: rooms.length, icon: Users, colorClasses: 'bg-emerald-500/10 text-emerald-400' },
+              { label: 'Deployable', val: rooms.filter(r => r.status === "waiting").length, icon: Play, colorClasses: 'bg-lime-500/10 text-lime-400' },
+              { label: 'Active Wars', val: rooms.filter(r => r.status === "playing").length, icon: Target, colorClasses: 'bg-orange-500/10 text-orange-400' },
+              { label: 'Warriors', val: rooms.reduce((acc, r) => acc + r.players, 0), icon: Crown, colorClasses: 'bg-emerald-500/10 text-emerald-400' },
+            ].map((stat, i) => (
+              <div key={i} className="bg-emerald-500/5 border border-emerald-500/10 p-6 rounded-3xl backdrop-blur-sm group hover:border-emerald-500/40 transition-all">
+                <div className="flex items-center gap-4">
+                  <div className={`p-3 rounded-2xl ${stat.colorClasses.split(' ')[0]}`}>
+                    <stat.icon className={`w-6 h-6 ${stat.colorClasses.split(' ')[1]}`} />
+                  </div>
+                  <div>
+                    <p className="text-3xl font-black text-white">{stat.val}</p>
+                    <p className="text-[10px] font-bold text-emerald-500/50 uppercase tracking-widest">{stat.label}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Rooms Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredRooms.map((room) => (
+              <Card key={room.id} className="bg-black/40 backdrop-blur-xl border-emerald-500/20 hover:border-emerald-400/50 transition-all group overflow-hidden rounded-3xl">
+                <div className="h-1 bg-gradient-to-r from-emerald-500 to-lime-500 opacity-30 group-hover:opacity-100 transition-opacity" />
+                <CardContent className="p-8">
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 group-hover:scale-110 transition-transform">
+                      <Target className="w-8 h-8 text-emerald-400" />
                     </div>
+                    <Badge className={room.status === 'waiting' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-slate-800 text-slate-400'}>
+                      {room.status.toUpperCase()}
+                    </Badge>
+                  </div>
 
-                    <div className="flex items-center gap-4">
-                      <div className="text-center">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Users className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">
-                            {room.players}/{room.maxPlayers}
-                          </span>
-                        </div>
-                        <Badge className={`text-xs ${getStatusColor(room.status)}`}>{room.status}</Badge>
-                      </div>
+                  <h3 className="text-xl font-black text-white mb-2 group-hover:text-emerald-400 transition-colors uppercase tracking-tight">
+                    {room.name}
+                  </h3>
 
-                      <Button
-                        onClick={() => handleJoinRoom(room)}
-                        disabled={room.status !== "waiting" || isLoading}
-                        className={`${room.status === "waiting" ? "bg-primary hover:bg-primary/90 glow-hover" : ""}`}
-                        variant={room.status === "waiting" ? "default" : "outline"}
-                      >
-                        {room.status === "waiting" && (
-                          <>
-                            <Play className="w-4 h-4 mr-2" />
-                            Join Room
-                          </>
-                        )}
-                        {room.status === "playing" && "In Progress"}
-                        {room.status === "full" && "Room Full"}
-                      </Button>
+                  <div className="space-y-3 mb-8">
+                    <div className="flex items-center gap-2 text-emerald-300/50 text-xs font-bold uppercase">
+                      <Gamepad2 className="w-4 h-4" /> {room.game}
                     </div>
+                    <div className="flex items-center gap-2 text-emerald-300/50 text-xs font-bold uppercase">
+                      <Users className="w-4 h-4" /> HOST: <span className="text-emerald-400">{room.host}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-emerald-300/50 text-xs font-bold uppercase">
+                      <Clock className="w-4 h-4" /> SYNCED: {room.createdAt}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4 pt-4 border-t border-emerald-500/10">
+                    <div className="text-center">
+                      <p className="text-xl font-black text-white">{room.players}/{room.maxPlayers}</p>
+                      <p className="text-[10px] font-bold text-emerald-500/40 uppercase">Capacitors</p>
+                    </div>
+                    <Button
+                      onClick={() => handleJoinRoom(room)}
+                      disabled={room.status !== "waiting" || isLoading}
+                      className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-black rounded-xl transition-all active:scale-95 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                    >
+                      {room.status === "waiting" ? "ENGAGE" : "LOCKED"}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
-            ))
-          )}
+            ))}
+          </div>
         </div>
       </div>
+      <style jsx global>{`
+        body { background: black; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #10b98133; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #10b98166; }
+      `}</style>
     </div>
   )
 }

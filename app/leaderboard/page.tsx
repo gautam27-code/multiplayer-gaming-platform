@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -21,9 +21,9 @@ import {
   Gamepad2,
   Calendar,
   Filter,
+  Clock
 } from "lucide-react"
 import Link from "next/link"
-import { useEffect } from "react"
 import { useAuthStore } from "@/lib/stores/auth"
 import { userApi } from "@/lib/api"
 
@@ -43,38 +43,96 @@ interface Player {
   title?: string
 }
 
-interface GameStats {
-  game: string
-  players: Player[]
-}
-
 export default function LeaderboardPage() {
   const [timeFilter, setTimeFilter] = useState("all-time")
-  const [gameFilter, setGameFilter] = useState("all")
-
   const [globalLeaderboard, setGlobalLeaderboard] = useState<Player[]>([])
-  const { token } = useAuthStore()
+  const { token, user } = useAuthStore()
 
+  // Animation States
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // 1. Mouse Follower Effect
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePos({ x: e.clientX, y: e.clientY });
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
+  // 2. Particle Canvas (Reddish-Orange Theme)
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const particles: any[] = [];
+    for (let i = 0; i < 50; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: (Math.random() - 0.5) * 0.5,
+        radius: Math.random() * 2 + 1,
+        opacity: Math.random() * 0.5 + 0.2
+      });
+    }
+
+    function animate() {
+      if (!canvas || !ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        // Using Reddish-Orange Theme color
+        ctx.fillStyle = `rgba(255, 87, 34, ${p.opacity})`;
+        ctx.fill();
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+        if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+      });
+      requestAnimationFrame(animate);
+    }
+    animate();
+  }, []);
+
+  // Fetch Logic
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
         if (!token) return
         const list: any[] = await userApi.getLeaderboard(token)
-        const mapped: Player[] = list.map((u: any, idx: number) => ({
+
+        // 1. Calculate points and map initially
+        const mappedWithPoints = list.map((u: any) => ({
           id: u._id,
           username: u.username,
           avatar: "/placeholder.svg",
-          rank: idx + 1,
           points: Math.round((u.stats?.wins || 0) * 10 + (u.stats?.matchesPlayed || 0)),
           wins: u.stats?.wins || 0,
           losses: u.stats?.losses || 0,
           winRate: Math.round((u.stats?.winRate || 0) * 10) / 10,
           gamesPlayed: u.stats?.matchesPlayed || 0,
           streak: 0,
-          rankChange: "same",
+          rankChange: "same" as const,
           level: Math.max(1, Math.floor((u.stats?.wins || 0) / 5)),
-          title: undefined,
         }))
+
+        // 2. Sort by points descending
+        mappedWithPoints.sort((a, b) => b.points - a.points)
+
+        // 3. Assign true rank
+        const mapped: Player[] = mappedWithPoints.map((p, idx) => ({
+          ...p,
+          rank: idx + 1
+        }))
+
         setGlobalLeaderboard(mapped)
       } catch (e) {
         console.error(e)
@@ -83,452 +141,207 @@ export default function LeaderboardPage() {
     fetchLeaderboard()
   }, [token])
 
-  const [gameStats] = useState<GameStats[]>([
-    {
-      game: "Tic-Tac-Toe",
-      players: globalLeaderboard.slice(0, 10),
-    },
-    {
-      game: "Chess",
-      players: [],
-    },
-    {
-      game: "Connect 4",
-      players: [],
-    },
-  ])
-
   const topThree = globalLeaderboard.slice(0, 3)
   const restOfLeaderboard = globalLeaderboard.slice(3)
-  const currentPlayer = globalLeaderboard.find((p) => p.username === "player11")
-
-  const getRankIcon = (rank: number) => {
-    switch (rank) {
-      case 1:
-        return <Crown className="w-6 h-6 text-yellow-500" />
-      case 2:
-        return <Medal className="w-6 h-6 text-gray-400" />
-      case 3:
-        return <Award className="w-6 h-6 text-amber-600" />
-      default:
-        return <span className="text-lg font-bold text-muted-foreground">#{rank}</span>
-    }
-  }
-
-  const getRankChangeIcon = (change: "up" | "down" | "same") => {
-    switch (change) {
-      case "up":
-        return <TrendingUp className="w-4 h-4 text-green-500" />
-      case "down":
-        return <TrendingDown className="w-4 h-4 text-red-500" />
-      case "same":
-        return <Minus className="w-4 h-4 text-muted-foreground" />
-    }
-  }
-
-  const getTitleColor = (title?: string) => {
-    switch (title) {
-      case "Grand Master":
-        return "bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent"
-      case "Master":
-        return "bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent"
-      case "Expert":
-        return "bg-gradient-to-r from-blue-500 to-cyan-500 bg-clip-text text-transparent"
-      default:
-        return "text-muted-foreground"
-    }
-  }
+  const currentPlayer = globalLeaderboard.find((p) => p.username === user?.username)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      {/* Background effects */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-20 right-20 w-64 h-64 bg-primary/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-20 left-20 w-64 h-64 bg-accent/10 rounded-full blur-3xl animate-pulse delay-1000" />
-      </div>
+    <div className="relative min-h-screen bg-black text-white overflow-x-hidden">
+      {/* 3. Animated Background Elements */}
+      <canvas ref={canvasRef} className="fixed inset-0 z-0 pointer-events-none" />
 
-      {/* Navigation */}
-      <nav className="relative z-10 glass border-b border-white/10 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Link href="/dashboard">
-                <Button variant="ghost" size="sm" className="glow-hover">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Dashboard
-                </Button>
-              </Link>
-              <div className="flex items-center gap-2">
-                <Trophy className="w-6 h-6 text-primary" />
-                <span className="text-lg font-bold">Leaderboard</span>
+      {/* Red/Orange Gradient Overlays */}
+      <div className="fixed inset-0 bg-gradient-to-br from-orange-600/10 via-transparent to-red-600/10 z-0 pointer-events-none" />
+      <div className="fixed top-0 right-0 w-[800px] h-[800px] bg-orange-500/15 rounded-full blur-[150px] animate-pulse z-0 pointer-events-none" />
+      <div className="fixed bottom-0 left-0 w-[600px] h-[600px] bg-red-500/15 rounded-full blur-[150px] animate-pulse z-0 pointer-events-none" style={{ animationDelay: '1s' }} />
+
+      {/* Mouse Follower Glow */}
+      <div
+        className="fixed w-8 h-8 bg-orange-500/30 rounded-full blur-xl pointer-events-none z-50 transition-transform duration-100"
+        style={{ left: mousePos.x - 16, top: mousePos.y - 16 }}
+      />
+
+      {/* Main Content */}
+      <div className="relative z-10">
+        {/* Navigation */}
+        <nav className="sticky top-0 z-50 border-b border-orange-500/30 backdrop-blur-xl bg-black/40">
+          <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Link href="/dashboard">
+                  <Button variant="ghost" className="text-orange-400 hover:text-white hover:bg-orange-500/20 border border-orange-500/20">
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back to Dashboard
+                  </Button>
+                </Link>
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-6 h-6 text-orange-500 drop-shadow-[0_0_10px_rgba(255,165,0,0.5)]" />
+                  <span className="text-xl font-black tracking-tighter bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">LEADERBOARD</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </nav>
+
+        <div className="max-w-7xl mx-auto px-6 py-12">
+          {/* Header */}
+          <div className="text-center mb-12">
+            <h1 className="text-6xl font-black mb-4 bg-gradient-to-r from-orange-400 via-red-500 to-orange-600 bg-clip-text text-transparent animate-pulse">
+              GLOBAL STAGE
+            </h1>
+            <p className="text-orange-300/60 tracking-widest uppercase text-sm font-bold">Global Leaderboard Synchronization</p>
+          </div>
+
+          <div className="grid grid-cols-12 gap-8">
+            <div className="col-span-12 lg:col-span-9 space-y-8">
+
+              {/* Podium Section */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+                {/* 2nd Place */}
+                <Card className="bg-black/40 backdrop-blur-xl border-orange-500/20 hover:border-orange-500/50 transition-all group order-2 md:order-1">
+                  <CardContent className="p-6 text-center">
+                    <div className="w-16 h-16 mx-auto mb-4 relative">
+                      <div className="absolute inset-0 bg-orange-500/20 blur-lg rounded-full group-hover:bg-orange-500/40 transition-all" />
+                      <Avatar className="w-full h-full border-2 border-slate-400">
+                        <AvatarFallback className="bg-slate-800 text-slate-300">{topThree[1]?.username[0]}</AvatarFallback>
+                      </Avatar>
+                      <Badge className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-slate-500">#2</Badge>
+                    </div>
+                    <h3 className="font-black text-white">{topThree[1]?.username || "---"}</h3>
+                    <p className="text-orange-500 font-bold text-sm">{topThree[1]?.points.toLocaleString()} PTS</p>
+                  </CardContent>
+                </Card>
+
+                {/* 1st Place */}
+                <Card className="bg-black/60 backdrop-blur-2xl border-orange-400 shadow-[0_0_30px_rgba(255,165,0,0.2)] transform scale-110 z-10 order-1 md:order-2">
+                  <CardContent className="p-8 text-center">
+                    <Crown className="w-10 h-10 text-orange-400 mx-auto mb-4 animate-bounce" />
+                    <div className="w-24 h-24 mx-auto mb-4 relative">
+                      <div className="absolute inset-0 bg-orange-400/30 blur-2xl rounded-full animate-pulse" />
+                      <Avatar className="w-full h-full border-4 border-orange-400">
+                        <AvatarFallback className="bg-orange-950 text-orange-400 text-2xl font-black">{topThree[0]?.username[0]}</AvatarFallback>
+                      </Avatar>
+                    </div>
+                    <h3 className="text-2xl font-black text-white">{topThree[0]?.username || "---"}</h3>
+                    <p className="bg-orange-500 text-black font-black px-3 py-1 rounded-full text-xs inline-block mt-2">CHAMPION</p>
+                    <p className="text-orange-400 font-black text-xl mt-2">{topThree[0]?.points.toLocaleString()} PTS</p>
+                  </CardContent>
+                </Card>
+
+                {/* 3rd Place */}
+                <Card className="bg-black/40 backdrop-blur-xl border-orange-500/20 hover:border-orange-500/50 transition-all group order-3">
+                  <CardContent className="p-6 text-center">
+                    <div className="w-16 h-16 mx-auto mb-4 relative">
+                      <div className="absolute inset-0 bg-orange-500/10 blur-lg rounded-full" />
+                      <Avatar className="w-full h-full border-2 border-orange-800">
+                        <AvatarFallback className="bg-orange-900/40 text-orange-700">{topThree[2]?.username[0]}</AvatarFallback>
+                      </Avatar>
+                      <Badge className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-orange-800">#3</Badge>
+                    </div>
+                    <h3 className="font-black text-white">{topThree[2]?.username || "---"}</h3>
+                    <p className="text-orange-500 font-bold text-sm">{topThree[2]?.points.toLocaleString()} PTS</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Main List */}
+              <Card className="bg-black/60 backdrop-blur-xl border-orange-500/20 rounded-3xl overflow-hidden">
+                <CardHeader className="border-b border-orange-500/10 flex flex-row items-center justify-between">
+                  <CardTitle className="text-orange-400 font-black tracking-widest">RANKINGS</CardTitle>
+                  <Select value={timeFilter} onValueChange={setTimeFilter}>
+                    <SelectTrigger className="w-40 bg-black/40 border-orange-500/30 text-orange-400">
+                      <SelectValue placeholder="Timeframe" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-900 border-orange-500/30 text-orange-100">
+                      <SelectItem value="all-time">All Time</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-orange-500/10">
+                    {restOfLeaderboard.map((player) => (
+                      <div key={player.id} className="flex items-center justify-between p-6 hover:bg-orange-500/5 transition-colors group">
+                        <div className="flex items-center gap-6">
+                          <span className="text-2xl font-black text-orange-500/30 group-hover:text-orange-500 transition-colors w-8">
+                            #{player.rank}
+                          </span>
+                          <Avatar className="w-12 h-12 border border-orange-500/20">
+                            <AvatarFallback className="bg-orange-950 text-orange-500 font-bold">{player.username[0]}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h4 className="font-bold text-white group-hover:text-orange-400 transition-colors">{player.username}</h4>
+                            <div className="flex gap-2 mt-1">
+                              <Badge variant="outline" className="text-[10px] border-orange-500/30 text-orange-300">LVL {player.level}</Badge>
+                              <span className="text-[10px] text-slate-500 flex items-center gap-1"><Target className="w-3 h-3" /> {player.winRate}% WR</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xl font-black text-orange-400">{player.points.toLocaleString()}</p>
+                          <p className="text-[10px] text-orange-500/50 uppercase font-bold tracking-tighter">Nexus Points</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Sidebar Stats */}
+            <div className="col-span-12 lg:col-span-3 space-y-6">
+              <Card className="bg-black/60 backdrop-blur-xl border-orange-500/20 rounded-3xl p-2">
+                <CardHeader>
+                  <CardTitle className="text-sm font-black text-orange-500 uppercase tracking-widest">Global Stats</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="p-4 bg-orange-500/5 border border-orange-500/10 rounded-2xl">
+                    <p className="text-xs text-orange-300/60 uppercase font-bold">Total Combatss</p>
+                    <p className="text-3xl font-black text-white mt-1">{globalLeaderboard.length}</p>
+                  </div>
+                  <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-2xl">
+                    <p className="text-xs text-red-300/60 uppercase font-bold">Top Killstreak</p>
+                    <p className="text-3xl font-black text-white mt-1">{Math.max(...globalLeaderboard.map(p => p.streak), 0)}</p>
+                  </div>
+                  <Link href="/rooms" className="block">
+                    <Button className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 text-white font-black h-14 rounded-2xl shadow-[0_0_20px_rgba(255,87,34,0.3)] hover:shadow-[0_0_30px_rgba(255,87,34,0.5)] transition-all">
+                      CHALLENGE NOW
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+
+              {/* Mini News/Updates */}
+              <div className="bg-orange-500/5 border border-orange-500/20 rounded-3xl p-6">
+                <h4 className="font-black text-orange-500 text-xs uppercase mb-4 flex items-center gap-2">
+                  <Clock className="w-3 h-3" /> Season Ending
+                </h4>
+                <div className="space-y-2">
+                  <div className="h-2 bg-slate-900 rounded-full overflow-hidden">
+                    <div className="h-full bg-orange-500 w-3/4 animate-pulse" />
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-bold">14 DAYS : 02 HOURS : 45 MINS</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </nav>
-
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Global Leaderboard</h1>
-          <p className="text-muted-foreground">Compete with the best players worldwide</p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-3 space-y-8">
-            {/* Top 3 Podium */}
-            <Card className="glass glow-hover border-white/20">
-              <CardHeader className="text-center">
-                <CardTitle className="flex items-center justify-center gap-2">
-                  <Crown className="w-6 h-6 text-yellow-500" />
-                  Top Champions
-                </CardTitle>
-                <CardDescription>The elite players leading the competition</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* 2nd Place */}
-                  <div className="order-1 md:order-1">
-                    <Card className="glass border-white/20 bg-gradient-to-br from-gray-500/10 to-gray-600/10">
-                      <CardContent className="p-6 text-center">
-                        <div className="mb-4">
-                          <Medal className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                          <Badge className="bg-gray-500/20 text-gray-300">#2</Badge>
-                        </div>
-                        <Avatar className="w-16 h-16 mx-auto mb-4 ring-4 ring-gray-400/50">
-                          <AvatarImage src={topThree[1]?.avatar || "/placeholder.svg"} />
-                          <AvatarFallback className="bg-gray-400/20 text-gray-300 text-lg">
-                            {topThree[1]?.username.slice(0, 1).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <h3 className="font-bold text-lg mb-1">{topThree[1]?.username}</h3>
-                        {topThree[1]?.title && (
-                          <p className={`text-sm mb-2 ${getTitleColor(topThree[1].title)}`}>{topThree[1].title}</p>
-                        )}
-                        <div className="space-y-1 text-sm">
-                          <div className="flex justify-between">
-                            <span>Points:</span>
-                            <span className="font-semibold">{topThree[1]?.points.toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Win Rate:</span>
-                            <span className="font-semibold">{topThree[1]?.winRate}%</span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* 1st Place */}
-                  <div className="order-2 md:order-2">
-                    <Card className="glass border-white/20 bg-gradient-to-br from-yellow-500/10 to-orange-500/10 transform md:scale-110">
-                      <CardContent className="p-6 text-center">
-                        <div className="mb-4">
-                          <Crown className="w-16 h-16 text-yellow-500 mx-auto mb-2 animate-pulse" />
-                          <Badge className="bg-yellow-500/20 text-yellow-500 text-lg px-3 py-1">#1</Badge>
-                        </div>
-                        <Avatar className="w-20 h-20 mx-auto mb-4 ring-4 ring-yellow-500/50 glow">
-                          <AvatarImage src={topThree[0]?.avatar || "/placeholder.svg"} />
-                          <AvatarFallback className="bg-yellow-500/20 text-yellow-500 text-xl">
-                            {topThree[0]?.username.slice(0, 1).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <h3 className="font-bold text-xl mb-1">{topThree[0]?.username}</h3>
-                        {topThree[0]?.title && (
-                          <p className={`text-sm mb-2 font-semibold ${getTitleColor(topThree[0].title)}`}>
-                            {topThree[0].title}
-                          </p>
-                        )}
-                        <div className="space-y-1 text-sm">
-                          <div className="flex justify-between">
-                            <span>Points:</span>
-                            <span className="font-bold text-yellow-500">{topThree[0]?.points.toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Win Rate:</span>
-                            <span className="font-bold text-yellow-500">{topThree[0]?.winRate}%</span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* 3rd Place */}
-                  <div className="order-3 md:order-3">
-                    <Card className="glass border-white/20 bg-gradient-to-br from-amber-600/10 to-amber-700/10">
-                      <CardContent className="p-6 text-center">
-                        <div className="mb-4">
-                          <Award className="w-12 h-12 text-amber-600 mx-auto mb-2" />
-                          <Badge className="bg-amber-600/20 text-amber-600">#3</Badge>
-                        </div>
-                        <Avatar className="w-16 h-16 mx-auto mb-4 ring-4 ring-amber-600/50">
-                          <AvatarImage src={topThree[2]?.avatar || "/placeholder.svg"} />
-                          <AvatarFallback className="bg-amber-600/20 text-amber-600 text-lg">
-                            {topThree[2]?.username.slice(0, 1).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <h3 className="font-bold text-lg mb-1">{topThree[2]?.username}</h3>
-                        {topThree[2]?.title && (
-                          <p className={`text-sm mb-2 ${getTitleColor(topThree[2].title)}`}>{topThree[2].title}</p>
-                        )}
-                        <div className="space-y-1 text-sm">
-                          <div className="flex justify-between">
-                            <span>Points:</span>
-                            <span className="font-semibold">{topThree[2]?.points.toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Win Rate:</span>
-                            <span className="font-semibold">{topThree[2]?.winRate}%</span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Your Rank */}
-            {currentPlayer && (
-              <Card className="glass glow-hover border-white/20 bg-gradient-to-r from-primary/5 to-accent/5">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Star className="w-5 h-5 text-primary" />
-                    Your Ranking
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between p-4 bg-card/50 rounded-lg">
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        {getRankIcon(currentPlayer.rank)}
-                        {getRankChangeIcon(currentPlayer.rankChange)}
-                      </div>
-                      <Avatar className="w-12 h-12 ring-2 ring-primary/50">
-                        <AvatarImage src={currentPlayer.avatar || "/placeholder.svg"} />
-                        <AvatarFallback className="bg-primary/20 text-primary">
-                          {currentPlayer.username.slice(0, 1).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-lg">{currentPlayer.username}</span>
-                          <Badge variant="outline">Lv.{currentPlayer.level}</Badge>
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {currentPlayer.points.toLocaleString()} points • {currentPlayer.winRate}% win rate
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-primary">#{currentPlayer.rank}</div>
-                      <div className="text-sm text-muted-foreground">Global Rank</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Filters and Tabs */}
-            <Card className="glass glow-hover border-white/20">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-primary" />
-                    Rankings
-                  </CardTitle>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <Filter className="w-4 h-4 text-muted-foreground" />
-                      <Select value={timeFilter} onValueChange={setTimeFilter}>
-                        <SelectTrigger className="w-32 glass border-white/20">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all-time">All Time</SelectItem>
-                          <SelectItem value="monthly">This Month</SelectItem>
-                          <SelectItem value="weekly">This Week</SelectItem>
-                          <SelectItem value="daily">Today</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="global" className="space-y-6">
-                  <TabsList className="grid w-full grid-cols-4 glass">
-                    <TabsTrigger value="global" className="data-[state=active]:bg-primary/20">
-                      Global
-                    </TabsTrigger>
-                    <TabsTrigger value="tic-tac-toe" className="data-[state=active]:bg-primary/20">
-                      Tic-Tac-Toe
-                    </TabsTrigger>
-                    <TabsTrigger value="chess" className="data-[state=active]:bg-primary/20" disabled>
-                      Chess
-                    </TabsTrigger>
-                    <TabsTrigger value="connect-4" className="data-[state=active]:bg-primary/20" disabled>
-                      Connect 4
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="global" className="space-y-4">
-                    {restOfLeaderboard.map((player, index) => (
-                      <div
-                        key={player.id}
-                        className={`flex items-center justify-between p-4 rounded-lg transition-all duration-300 hover:scale-[1.02] ${
-                          player.username === "player11"
-                            ? "bg-primary/10 ring-2 ring-primary/50 glow"
-                            : "bg-card/50 hover:bg-card/70"
-                        }`}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-2 w-16">
-                            {getRankIcon(player.rank)}
-                            {getRankChangeIcon(player.rankChange)}
-                          </div>
-                          <Avatar className="w-12 h-12 ring-2 ring-primary/30">
-                            <AvatarImage src={player.avatar || "/placeholder.svg"} />
-                            <AvatarFallback className="bg-primary/20 text-primary">
-                              {player.username.slice(0, 1).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold">{player.username}</span>
-                              <Badge variant="outline" className="text-xs">
-                                Lv.{player.level}
-                              </Badge>
-                              {player.title && (
-                                <Badge variant="outline" className={`text-xs ${getTitleColor(player.title)}`}>
-                                  {player.title}
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {player.gamesPlayed} games • {player.streak} win streak
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-bold text-lg">{player.points.toLocaleString()}</div>
-                          <div className="text-sm text-muted-foreground">{player.winRate}% win rate</div>
-                        </div>
-                      </div>
-                    ))}
-                  </TabsContent>
-
-                  <TabsContent value="tic-tac-toe" className="space-y-4">
-                    {gameStats[0].players.map((player, index) => (
-                      <div
-                        key={player.id}
-                        className={`flex items-center justify-between p-4 rounded-lg transition-all duration-300 hover:scale-[1.02] ${
-                          player.username === "player11"
-                            ? "bg-primary/10 ring-2 ring-primary/50 glow"
-                            : "bg-card/50 hover:bg-card/70"
-                        }`}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-2 w-16">
-                            {getRankIcon(player.rank)}
-                            {getRankChangeIcon(player.rankChange)}
-                          </div>
-                          <Avatar className="w-12 h-12 ring-2 ring-primary/30">
-                            <AvatarImage src={player.avatar || "/placeholder.svg"} />
-                            <AvatarFallback className="bg-primary/20 text-primary">
-                              {player.username.slice(0, 1).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold">{player.username}</span>
-                              <Badge variant="outline" className="text-xs">
-                                Lv.{player.level}
-                              </Badge>
-                              {player.title && (
-                                <Badge variant="outline" className={`text-xs ${getTitleColor(player.title)}`}>
-                                  {player.title}
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="text-sm text-muted-foreground flex items-center gap-2">
-                              <Target className="w-4 h-4" />
-                              {player.wins}W / {player.losses}L • {player.streak} streak
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-bold text-lg">{player.points.toLocaleString()}</div>
-                          <div className="text-sm text-muted-foreground">{player.winRate}% win rate</div>
-                        </div>
-                      </div>
-                    ))}
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Leaderboard Stats */}
-            <Card className="glass glow-hover border-white/20">
-              <CardHeader>
-                <CardTitle className="text-lg">Leaderboard Stats</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="text-center p-3 bg-primary/10 rounded-lg">
-                    <div className="text-xl font-bold text-primary">{globalLeaderboard.length}</div>
-                    <div className="text-xs text-muted-foreground">Total Players</div>
-                  </div>
-                  <div className="text-center p-3 bg-yellow-500/10 rounded-lg">
-                    <div className="text-xl font-bold text-yellow-500">
-                      {globalLeaderboard[0]?.points.toLocaleString()}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Top Score</div>
-                  </div>
-                  <div className="text-center p-3 bg-green-500/10 rounded-lg">
-                    <div className="text-xl font-bold text-green-500">
-                      {Math.max(...globalLeaderboard.map((p) => p.streak))}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Best Streak</div>
-                  </div>
-                  <div className="text-center p-3 bg-accent/10 rounded-lg">
-                    <div className="text-xl font-bold text-accent">
-                      {Math.round(globalLeaderboard.reduce((acc, p) => acc + p.winRate, 0) / globalLeaderboard.length)}%
-                    </div>
-                    <div className="text-xs text-muted-foreground">Avg Win Rate</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Quick Actions */}
-            <Card className="glass glow-hover border-white/20">
-              <CardContent className="p-4 space-y-3">
-                <Link href="/rooms">
-                  <Button className="w-full bg-primary hover:bg-primary/90 glow-hover">
-                    <Gamepad2 className="w-4 h-4 mr-2" />
-                    Play Now
-                  </Button>
-                </Link>
-                <Link href="/friends">
-                  <Button variant="outline" className="w-full glass border-white/20 bg-transparent">
-                    <Trophy className="w-4 h-4 mr-2" />
-                    Challenge Friends
-                  </Button>
-                </Link>
-                <Button variant="outline" className="w-full glass border-white/20 bg-transparent">
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Tournaments
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
       </div>
+
+      {/* 4. Global Theming Styles */}
+      <style jsx global>{`
+        @keyframes spin-slow {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .animate-spin-slow {
+          animation: spin-slow 8s linear infinite;
+        }
+        ::selection {
+          background: rgba(255, 87, 34, 0.3);
+          color: white;
+        }
+      `}</style>
     </div>
   )
 }

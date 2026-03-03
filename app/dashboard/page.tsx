@@ -143,7 +143,7 @@ export default function FuturisticDashboard() {
                   <div className="absolute inset-0 bg-cyan-400/20 blur-xl rounded-full animate-ping" />
                 </div>
                 <span className="text-3xl font-black bg-gradient-to-r from-cyan-400 via-magenta-400 to-purple-400 bg-clip-text text-transparent tracking-wider">
-                  NEXUS
+                  ClutchZone
                 </span>
               </div>
 
@@ -401,9 +401,7 @@ export default function FuturisticDashboard() {
               <div className="relative bg-black/60 backdrop-blur-xl border border-white/10 rounded-3xl p-8">
                 <h2 className="text-3xl font-black mb-8 flex items-center gap-3">
                   <Newspaper className="w-8 h-8 text-cyan-400" />
-                  <span className="bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-                    LATEST INTEL
-                  </span>
+                  COMING SOON!
                 </h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

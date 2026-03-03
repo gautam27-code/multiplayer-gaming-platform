@@ -14,12 +14,11 @@ import { useAuthStore } from "@/lib/stores/auth"
 // Floating Character Component
 const FloatingCharacter = ({ emoji, delay = 0 }: { emoji: string; delay?: number }) => {
   const [isHovered, setIsHovered] = useState(false);
-  
+
   return (
     <div
-      className={`text-5xl cursor-pointer transition-all duration-300 ease-out transform hover:scale-110 ${
-        isHovered ? 'animate-bounce' : 'animate-pulse'
-      }`}
+      className={`text-5xl cursor-pointer transition-all duration-300 ease-out transform hover:scale-110 ${isHovered ? 'animate-bounce' : 'animate-pulse'
+        }`}
       style={{
         animationDelay: `${delay}ms`,
         filter: 'drop-shadow(0 0 10px rgba(6, 182, 212, 0.5))'
@@ -68,8 +67,8 @@ export default function AuthPage() {
       {/* Animated background effects */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-cyan-400/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-cyan-400/10 rounded-full blur-3xl animate-ping" style={{animationDelay: '2s'}}></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-cyan-400/10 rounded-full blur-3xl animate-ping" style={{ animationDelay: '2s' }}></div>
       </div>
 
       {/* Main heading */}
@@ -130,7 +129,7 @@ export default function AuthPage() {
           </CardHeader>
           <CardContent className="p-8 pt-0">
             <Tabs defaultValue="login" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 bg-black/30 backdrop-blur-sm rounded-2xl p-1 border border-cyan-400/20">
+              <TabsList className="grid w-full grid-cols-2 bg-black/30 backdrop-blur-sm rounded-2xl p-1 border border-cyan-400/20 h-auto">
                 <TabsTrigger value="login" className="px-6 py-3 rounded-xl font-medium transition-all duration-300 ease-out data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-400/20 data-[state=active]:to-purple-400/20 data-[state=active]:text-white data-[state=active]:border data-[state=active]:border-cyan-400/50 data-[state=active]:shadow-lg data-[state=active]:shadow-cyan-400/20 text-cyan-300/70 hover:text-white hover:bg-white/5">
                   Login
                 </TabsTrigger>
@@ -170,9 +169,9 @@ export default function AuthPage() {
                       className="w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-cyan-400/30 rounded-xl text-white placeholder-cyan-300/50 focus:outline-none focus:border-cyan-400 focus:shadow-lg focus:shadow-cyan-400/20 transition-all duration-300 glass"
                     />
                   </div>
-                  <Button 
-                    type="submit" 
-                    disabled={isLoading} 
+                  <Button
+                    type="submit"
+                    disabled={isLoading}
                     className="w-full px-6 py-4 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold rounded-xl transition-all duration-300 ease-out transform hover:scale-105 hover:shadow-xl hover:shadow-cyan-400/30 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:hover:shadow-none hover:from-cyan-300 hover:to-purple-400 glow-hover"
                   >
                     {isLoading ? (
@@ -229,9 +228,9 @@ export default function AuthPage() {
                       className="w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-cyan-400/30 rounded-xl text-white placeholder-cyan-300/50 focus:outline-none focus:border-cyan-400 focus:shadow-lg focus:shadow-cyan-400/20 transition-all duration-300 glass"
                     />
                   </div>
-                  <Button 
-                    type="submit" 
-                    disabled={isLoading} 
+                  <Button
+                    type="submit"
+                    disabled={isLoading}
                     className="w-full px-6 py-4 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold rounded-xl transition-all duration-300 ease-out transform hover:scale-105 hover:shadow-xl hover:shadow-cyan-400/30 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:hover:shadow-none hover:from-cyan-300 hover:to-purple-400 glow-hover"
                   >
                     {isLoading ? (

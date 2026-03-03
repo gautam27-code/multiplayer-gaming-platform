@@ -78,7 +78,13 @@ export const initializeSocket = (token: string): GameSocket => {
 export const joinGameRoom = (gameId: string) => {
   if (socket) {
     socket.gameId = gameId;
-    socket.emit('join-game', gameId);
+    if (socket.connected) {
+      socket.emit('join-game', gameId);
+    } else {
+      socket.once('connect', () => {
+        socket?.emit('join-game', gameId);
+      });
+    }
   }
 };
 

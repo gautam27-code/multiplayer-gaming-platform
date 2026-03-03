@@ -30,14 +30,14 @@ export default function SignupPage() {
       await register(username, email, password)
       toast.success("Account created!")
       router.push("/dashboard")
-    } catch {}
+    } catch { }
   }
 
   return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-cyan-400/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
       </div>
 
       <div className="text-center mb-8 relative z-10">
@@ -67,17 +67,17 @@ export default function SignupPage() {
             >
               <div className="space-y-2">
                 <Label htmlFor="username" className="block text-sm font-medium text-cyan-300 mb-2">Username</Label>
-                <Input id="username" name="username" required placeholder="player11" className="w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-cyan-400/30 rounded-xl text-white placeholder-cyan-300/50 focus:outline-none focus:border-cyan-400 focus:shadow-lg focus:shadow-cyan-400/20 transition-all duration-300" />
+                <Input id="username" name="username" required placeholder="player11" className="h-auto w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-cyan-400/30 rounded-xl text-white placeholder-cyan-300/50 focus:outline-none focus:border-cyan-400 focus:shadow-lg focus:shadow-cyan-400/20 transition-all duration-300" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email" className="block text-sm font-medium text-cyan-300 mb-2">Email</Label>
-                <Input id="email" name="email" type="email" required placeholder="player@gamehub.com" className="w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-cyan-400/30 rounded-xl text-white placeholder-cyan-300/50 focus:outline-none focus:border-cyan-400 focus:shadow-lg focus:shadow-cyan-400/20 transition-all duration-300" />
+                <Input id="email" name="email" type="email" required placeholder="player@gamehub.com" className="h-auto w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-cyan-400/30 rounded-xl text-white placeholder-cyan-300/50 focus:outline-none focus:border-cyan-400 focus:shadow-lg focus:shadow-cyan-400/20 transition-all duration-300" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password" className="block text-sm font-medium text-cyan-300 mb-2">Password</Label>
-                <Input id="password" name="password" type="password" required minLength={6} className="w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-cyan-400/30 rounded-xl text-white placeholder-cyan-300/50 focus:outline-none focus:border-cyan-400 focus:shadow-lg focus:shadow-cyan-400/20 transition-all duration-300" />
+                <Input id="password" name="password" type="password" required minLength={6} className="h-auto w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-cyan-400/30 rounded-xl text-white placeholder-cyan-300/50 focus:outline-none focus:border-cyan-400 focus:shadow-lg focus:shadow-cyan-400/20 transition-all duration-300" />
               </div>
-              <Button type="submit" disabled={isLoading} className="w-full px-6 py-4 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold rounded-xl transition-all duration-300">
+              <Button type="submit" disabled={isLoading} className="h-auto w-full px-6 py-4 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold rounded-xl transition-all duration-300">
                 {isLoading ? 'Creating…' : 'Create Account'}
               </Button>
             </form>
