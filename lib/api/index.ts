@@ -32,8 +32,7 @@ export async function fetchApi<T>(
       headers,
     });
 
-    const text = await response.text();
-    const data = text ? JSON.parse(text) : {};
+    const data = await response.json();
 
     if (!response.ok) {
       throw new ApiError(
