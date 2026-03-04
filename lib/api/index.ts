@@ -16,7 +16,7 @@ export async function fetchApi<T>(
   options: FetchOptions = {}
 ): Promise<T> {
   const { token, ...fetchOptions } = options;
-  
+
   const headers = new Headers({
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
@@ -32,11 +32,12 @@ export async function fetchApi<T>(
       headers,
     });
 
-    const data = await response.json();
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : {};
 
     if (!response.ok) {
       throw new ApiError(
-        response.status, 
+        response.status,
         data.message || response.statusText || 'Something went wrong'
       );
     }
