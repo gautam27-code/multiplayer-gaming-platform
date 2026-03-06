@@ -137,37 +137,37 @@ export default function FuturisticDashboard() {
         <nav className="sticky top-0 z-50 border-b border-cyan-500/30 backdrop-blur-xl bg-black/40">
           <div className="max-w-7xl mx-auto px-6 py-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 group cursor-pointer">
+              <div className="flex items-center gap-2 md:gap-3 group cursor-pointer mr-2 md:mr-0 shrink-0">
                 <div className="relative">
-                  <Gamepad2 className="w-10 h-10 text-cyan-400 drop-shadow-[0_0_15px_rgba(0,255,255,0.7)] transition-all group-hover:scale-110 group-hover:rotate-12" />
+                  <Gamepad2 className="w-8 h-8 md:w-10 md:h-10 text-cyan-400 drop-shadow-[0_0_15px_rgba(0,255,255,0.7)] transition-all group-hover:scale-110 group-hover:rotate-12" />
                   <div className="absolute inset-0 bg-cyan-400/20 blur-xl rounded-full animate-ping" />
                 </div>
-                <span className="text-3xl font-black bg-gradient-to-r from-cyan-400 via-magenta-400 to-purple-400 bg-clip-text text-transparent tracking-wider">
-                  ClutchZone
+                <span className="text-xl md:text-3xl font-black bg-gradient-to-r from-cyan-400 via-magenta-400 to-purple-400 bg-clip-text text-transparent tracking-wider">
+                  Playtopia.
                 </span>
               </div>
 
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 md:gap-4 overflow-x-auto pb-2 md:pb-0 scrollbar-hide shrink-0">
                 {[
                   { icon: History, label: 'History...', link: '/history' },
                   { icon: Users, label: 'Squad', link: '/friends' },
                   { icon: Trophy, label: 'Leaderboard', link: '/leaderboard' },
                 ].map((item, i) => (
-                  <Link key={i} href={item.link}>
-                    <button className="group relative px-4 py-2 overflow-hidden rounded-lg border border-cyan-500/30 hover:border-cyan-400 transition-all hover:scale-105">
+                  <Link key={i} href={item.link} className="shrink-0">
+                    <button className="group relative px-3 py-1.5 md:px-4 md:py-2 overflow-hidden rounded-lg border border-cyan-500/30 hover:border-cyan-400 transition-all hover:scale-105">
                       <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/20 to-cyan-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-                      <div className="relative flex items-center gap-2">
-                        <item.icon className="w-4 h-4 text-cyan-400" />
-                        <span className="text-sm font-semibold">{item.label}</span>
+                      <div className="relative flex items-center gap-1.5 md:gap-2">
+                        <item.icon className="w-3 h-3 md:w-4 md:h-4 text-cyan-400" />
+                        <span className="text-xs md:text-sm font-semibold">{item.label}</span>
                       </div>
                     </button>
                   </Link>
                 ))}
                 <button
                   onClick={handleLogout}
-                  className="px-4 py-2 rounded-lg bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 transition-all hover:scale-105 shadow-[0_0_20px_rgba(255,0,100,0.5)]"
+                  className="shrink-0 px-3 py-1.5 md:px-4 md:py-2 rounded-lg bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 transition-all hover:scale-105 shadow-[0_0_20px_rgba(255,0,100,0.5)]"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-3 h-3 md:w-4 md:h-4" />
                 </button>
               </div>
             </div>

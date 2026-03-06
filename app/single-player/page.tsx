@@ -31,6 +31,7 @@ export default function SinglePlayerPage() {
   const [winner, setWinner] = useState<"X" | "O" | "draw" | null>(null)
   const [currentSymbol, setCurrentSymbol] = useState<"X" | "O">('X')
   const [isBusy, setIsBusy] = useState(false)
+  const [resetKey, setResetKey] = useState(0)
 
   // Animation States
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -107,7 +108,7 @@ export default function SinglePlayerPage() {
       }
     }
     start()
-  }, [token, router])
+  }, [token, router, resetKey])
 
   // Poll game state while playing to avoid any client desync
   useEffect(() => {
@@ -213,7 +214,13 @@ export default function SinglePlayerPage() {
 
   const resetLocal = () => {
     if (!gameId) return
-    router.replace('/single-player')
+    setGameId(null)
+    setBoard(Array(9).fill(null))
+    setStatus('loading')
+    setWinner(null)
+    setCurrentSymbol('X')
+    setIsBusy(false)
+    setResetKey(prev => prev + 1)
   }
 
   return (
