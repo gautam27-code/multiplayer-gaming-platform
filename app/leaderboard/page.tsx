@@ -107,7 +107,7 @@ export default function LeaderboardPage() {
     const fetchLeaderboard = async () => {
       try {
         if (!token) return
-        const list: any[] = await userApi.getLeaderboard(token)
+        const list = (await userApi.getLeaderboard(token)) as any[]
 
         // 1. Calculate points and map initially
         const mappedWithPoints = list.map((u: any) => ({
